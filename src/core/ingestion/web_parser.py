@@ -3,11 +3,12 @@
 import logging
 import re
 import time
-from typing import Dict, Any
+from typing import Any
 from urllib.parse import urlparse
 
-from .parser_factory import BaseParser
 from src.utils.security import validate_url
+
+from .parser_factory import BaseParser
 
 logger = logging.getLogger("hermes_rag")
 
@@ -19,7 +20,7 @@ class WebParser(BaseParser):
         self._max_retries = max_retries
         self._retry_delay = retry_delay
 
-    def parse(self, source: str) -> Dict[str, Any]:
+    def parse(self, source: str) -> dict[str, Any]:
         """Parse a web page.
 
         Args:

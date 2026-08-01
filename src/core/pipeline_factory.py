@@ -5,7 +5,6 @@ into a single reusable function.
 """
 
 import logging
-from typing import Optional
 
 logger = logging.getLogger("hermes_rag")
 
@@ -17,6 +16,7 @@ def build_pipeline(
     use_reranker: bool = True,
     use_sparse: bool = True,
     use_cache: bool = True,
+    auto_ensure: bool = True,
 ):
     """Build and return a configured RetrievalPipeline.
 
@@ -34,16 +34,19 @@ def build_pipeline(
         from src.config import get_config
         config = get_config()
 
-    from src.core.retrieval.retrieval_pipeline import RetrievalPipeline
-    from src.core.retrieval.query_expander import QueryExpander
-    from src.core.retrieval.dense_retriever import DenseRetriever
-    from src.core.retrieval.sparse_retriever import SparseRetriever
-    from src.core.retrieval.rule_retriever import RuleRetriever
-    from src.core.retrieval.rrf_fusion import RRFFusion
-    from src.core.reranking.cross_encoder import CrossEncoderReranker
-    from src.core.indexing.vector_store import VectorStore
     from src.core.indexing.bm25_index import BM25Index
+    from src.core.indexing.document_store import DocumentStore
     from src.core.indexing.index_manager import IndexManager
+    from src.core.indexing.vector_store import VectorStore
+    from src.core.reranking.cross_encoder import CrossEncoderReranker
+    from src.core.reranking.heuristic_reranker import HeuristicReranker
+    from src.core.retrieval.dense_retriever import DenseRetriever
+    from src.core.retrieval.multi_query_retriever import MultiQueryRetriever
+    from src.core.retrieval.query_expander import QueryExpander
+    from src.core.retrieval.retrieval_pipeline import RetrievalPipeline
+    from src.core.retrieval.rrf_fusion import RRFFusion
+    from src.core.retrieval.rule_retriever import RuleRetriever
+    from src.core.retrieval.sparse_retriever import SparseRetriever
     from src.utils.cache import QueryCache
     from src.utils.metrics import get_metrics
 
@@ -58,18 +61,25 @@ def build_pipeline(
         embedding_device=config.embedding.device,
     )
 
-    # BM25 index
+    # BM25 index (persistent by default so the sparse path survives restarts)
     bm25_index = BM25Index(
         b=config.bm25.b,
         k1=config.bm25.k1,
         max_index_entries=config.bm25.max_index_entries,
         fallback_db_path=config.bm25.fallback_db_path,
+        persist=config.bm25.persist,
+    )
+
+    # Document store: source of truth for automatic index recovery
+    document_store = DocumentStore(
+        db_path=config.chromadb.document_store_path,
     )
 
     # Index manager
     index_manager = IndexManager(
         vector_store=vector_store,
         bm25_index=bm25_index,
+        document_store=document_store,
     )
 
     # Query expander
@@ -96,14 +106,22 @@ def build_pipeline(
         colloquial_sparse_weight=config.retrieval.rrf_weights.colloquial_sparse,
     )
 
-    # Cross-encoder reranker
-    cross_encoder = CrossEncoderReranker(
-        model_name=config.reranking.model_name,
-        device=config.reranking.device,
-        batch_size=config.reranking.batch_size,
-        max_candidates=config.reranking.max_candidates,
-        timeout_seconds=config.reranking.timeout_seconds,
-    ) if use_reranker else None
+    # Cross-encoder reranker (only load heavy model if use_cross_encoder is enabled)
+    cross_encoder = None
+    if use_reranker and config.reranking.enabled:
+        if config.reranking.use_cross_encoder:
+            cross_encoder = CrossEncoderReranker(
+                model_name=config.reranking.model_name,
+                device=config.reranking.device,
+                batch_size=config.reranking.batch_size,
+                max_candidates=config.reranking.max_candidates,
+                timeout_seconds=config.reranking.timeout_seconds,
+            )
+        else:
+            # Use lightweight heuristic reranker (keyword overlap + positional signals)
+            cross_encoder = HeuristicReranker(
+                max_candidates=config.reranking.max_candidates,
+            )
 
     # Query cache
     cache = QueryCache(
@@ -112,16 +130,34 @@ def build_pipeline(
         ttl_seconds=config.cache.ttl_seconds,
     ) if use_cache else None
 
+    # Multi-query retriever (disabled by default: can introduce noise)
+    multi_query_retriever = MultiQueryRetriever(
+        max_variants=2,
+        enabled=False,
+    )
+
     # Retrieval config
     retrieval_config = {
         "dense_top_k": config.retrieval.dense_top_k,
         "sparse_top_k": config.retrieval.sparse_top_k,
         "fusion_top_k": config.retrieval.fusion_top_k,
+        "retrieval_timeout": config.retrieval.retrieval_timeout,
+        "retrieval_retries": config.retrieval.retrieval_retries,
+        "min_score_threshold": config.retrieval.min_score_threshold,
+        "context_window": getattr(config.retrieval, "context_window", 1),
         "reranking": {
             "enabled": config.reranking.enabled and use_reranker,
             "timeout_seconds": config.reranking.timeout_seconds,
         },
     }
+
+    if auto_ensure:
+        try:
+            health = index_manager.ensure_indexes()
+            if health.get("actions"):
+                logger.info("Index health actions: %s", health["actions"])
+        except Exception as e:
+            logger.warning(f"Index health check failed during pipeline build: {e}")
 
     logger.info("RetrievalPipeline built successfully")
     return RetrievalPipeline(
@@ -135,4 +171,5 @@ def build_pipeline(
         cache=cache,
         config=retrieval_config,
         metrics=get_metrics(),
+        multi_query_retriever=multi_query_retriever,
     )

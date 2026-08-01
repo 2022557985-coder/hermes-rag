@@ -1,3 +1,4 @@
+# ruff: noqa: E402
 """Complex scenario stress test for Hermes-RAG.
 
 Tests complex/edge cases:
@@ -13,22 +14,24 @@ Tests complex/edge cases:
 """
 
 import sys
-import json
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 import numpy as np
 
+from evaluation.eval import (
+    hit_rate_at_k,
+    mrr,
+    ndcg_at_k,
+    precision_at_k,
+    recall_at_k,
+)
+from src.core.retrieval.query_expander import QueryExpander
 from src.core.retrieval.retrieval_pipeline import QueryClassifier, RetrievalPipeline
 from src.core.retrieval.rrf_fusion import RRFFusion
-from src.core.retrieval.query_expander import QueryExpander
-from src.utils.metrics import MetricsCollector, reset_metrics
 from src.utils.cache import QueryCache
-from evaluation.eval import (
-    hit_rate_at_k, precision_at_k, recall_at_k, mrr, ndcg_at_k,
-)
+from src.utils.metrics import MetricsCollector, reset_metrics
 
 
 def test_header(title):
@@ -522,6 +525,7 @@ ok("Metrics reset works correctly")
 test_header("9. CROSS-ENCODER THREAD SAFETY")
 
 import threading
+
 from src.core.reranking.cross_encoder import CrossEncoderReranker
 
 # Test that _load_model uses a lock

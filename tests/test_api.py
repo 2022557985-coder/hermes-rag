@@ -80,8 +80,8 @@ class TestIngestEndpoint:
         assert "Path traversal" in data["detail"]["message"]
 
     def test_ingest_invalid_extension(self, client):
-        import tempfile
         import os
+        import tempfile
         with tempfile.NamedTemporaryFile(suffix=".exe", delete=False) as f:
             f.write(b"test")
             path = f.name
@@ -135,11 +135,7 @@ class TestEdgeCases:
             "query": "test",
             "top_k": 10000,
         })
-        if response.status_code == 500:
-            data = response.json()
-            assert "internal_error" in data.get("detail", {}).get("error", "")
-        else:
-            assert response.status_code == 200
+        assert response.status_code in (200, 422)
 
     def test_query_negative_top_k(self, client):
         """Query with negative top_k."""

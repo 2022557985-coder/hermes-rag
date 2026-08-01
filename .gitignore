@@ -1,49 +1,24 @@
-# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
 *.egg-info/
-dist/
-build/
-*.egg
-.eggs/
-
-# Virtual Environment
 .venv/
 venv/
 env/
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-
-# Data
-data/
-logs/
-*.db
-*.sqlite3
-
-# Models (downloaded at runtime)
-models/
-*.onnx
-
-# Environment
-.env
-.env.local
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Testing
+.pytest_cache/
+.ruff_cache/
 .coverage
 htmlcov/
-.pytest_cache/
-.tox/
 
-# Poetry
-poetry.lock
+/data/
+logs/
+_bm25.txt
+_pipeline_dump.txt
+*.db
+*.db-wal
+*.db-shm
+
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+local_packages/

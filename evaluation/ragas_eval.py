@@ -12,7 +12,7 @@ Installation: pip install ragas
 import json
 import sys
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
@@ -46,10 +46,10 @@ class RAGASAdapter:
 
     def evaluate_retrieval(
         self,
-        questions: List[str],
-        retrieved_contexts: List[List[str]],
-        ground_truth_contexts: List[List[str]],
-    ) -> Dict[str, float]:
+        questions: list[str],
+        retrieved_contexts: list[list[str]],
+        ground_truth_contexts: list[list[str]],
+    ) -> dict[str, float]:
         """Evaluate retrieval quality using RAGAS metrics.
 
         Args:
@@ -70,10 +70,10 @@ class RAGASAdapter:
 
     def _evaluate_heuristic(
         self,
-        questions: List[str],
-        retrieved_contexts: List[List[str]],
-        ground_truth_contexts: List[List[str]],
-    ) -> Dict[str, float]:
+        questions: list[str],
+        retrieved_contexts: list[list[str]],
+        ground_truth_contexts: list[list[str]],
+    ) -> dict[str, float]:
         """Heuristic-based evaluation when RAGAS is unavailable.
 
         Uses text overlap metrics as approximations:
@@ -108,14 +108,14 @@ class RAGASAdapter:
 
     def _evaluate_with_ragas(
         self,
-        questions: List[str],
-        retrieved_contexts: List[List[str]],
-        ground_truth_contexts: List[List[str]],
-    ) -> Dict[str, float]:
+        questions: list[str],
+        retrieved_contexts: list[list[str]],
+        ground_truth_contexts: list[list[str]],
+    ) -> dict[str, float]:
         """Full RAGAS evaluation with LLM-based metrics."""
+        from datasets import Dataset
         from ragas import evaluate
         from ragas.metrics import context_precision, context_recall
-        from datasets import Dataset
 
         data = {
             "question": questions,
@@ -137,10 +137,10 @@ class RAGASAdapter:
 
     def evaluate_generation(
         self,
-        questions: List[str],
-        answers: List[str],
-        contexts: List[List[str]],
-    ) -> Dict[str, float]:
+        questions: list[str],
+        answers: list[str],
+        contexts: list[list[str]],
+    ) -> dict[str, float]:
         """Evaluate generation quality.
 
         Args:
@@ -157,10 +157,10 @@ class RAGASAdapter:
 
     def _evaluate_generation_heuristic(
         self,
-        questions: List[str],
-        answers: List[str],
-        contexts: List[List[str]],
-    ) -> Dict[str, float]:
+        questions: list[str],
+        answers: list[str],
+        contexts: list[list[str]],
+    ) -> dict[str, float]:
         """Heuristic generation quality evaluation."""
         # Faithfulness approximation: check if answer tokens overlap with context
         faithfulness_scores = []
@@ -200,14 +200,14 @@ class RAGASAdapter:
 
     def _evaluate_generation_ragas(
         self,
-        questions: List[str],
-        answers: List[str],
-        contexts: List[List[str]],
-    ) -> Dict[str, float]:
+        questions: list[str],
+        answers: list[str],
+        contexts: list[list[str]],
+    ) -> dict[str, float]:
         """Full RAGAS generation evaluation."""
-        from ragas import evaluate
-        from ragas.metrics import faithfulness, answer_relevancy
         from datasets import Dataset
+        from ragas import evaluate
+        from ragas.metrics import answer_relevancy, faithfulness
 
         data = {
             "question": questions,
@@ -229,11 +229,11 @@ class RAGASAdapter:
 
     def run_full_evaluation(
         self,
-        questions: List[str],
-        answers: List[str],
-        retrieved_contexts: List[List[str]],
-        ground_truth_contexts: List[List[str]],
-    ) -> Dict[str, Any]:
+        questions: list[str],
+        answers: list[str],
+        retrieved_contexts: list[list[str]],
+        ground_truth_contexts: list[list[str]],
+    ) -> dict[str, Any]:
         """Run complete RAGAS evaluation.
 
         Args:
@@ -264,8 +264,8 @@ def run_ragas_eval():
     reset_config()
     cfg = get_config()
 
-    from src.core.pipeline_factory import build_pipeline
     from evaluation.dataset import EvaluationDataset
+    from src.core.pipeline_factory import build_pipeline
 
     print("=" * 60)
     print("  RAGAS Evaluation for Hermes-RAG")

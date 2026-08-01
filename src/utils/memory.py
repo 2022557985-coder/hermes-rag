@@ -4,7 +4,6 @@ import gc
 import logging
 import os
 import sys
-from typing import Optional
 
 logger = logging.getLogger("hermes_rag")
 
@@ -29,7 +28,7 @@ def get_memory_usage() -> dict:
         return {"rss_mb": -1, "vms_mb": -1, "percent": -1}
 
 
-def log_memory(log: Optional[object] = None, tag: str = "") -> None:
+def log_memory(log: object | None = None, tag: str = "") -> None:
     """Log current memory usage."""
     mem = get_memory_usage()
     msg = f"[MEMORY] {tag} RSS: {mem['rss_mb']:.1f}MB, VMS: {mem['vms_mb']:.1f}MB"

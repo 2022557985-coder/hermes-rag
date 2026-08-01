@@ -1,7 +1,7 @@
 """PPTX parser using python-pptx."""
 
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 from .parser_factory import BaseParser
 
@@ -9,7 +9,7 @@ from .parser_factory import BaseParser
 class PptxParser(BaseParser):
     """Parse PPTX presentations."""
 
-    def parse(self, source: str) -> Dict[str, Any]:
+    def parse(self, source: str) -> dict[str, Any]:
         """Parse a PPTX file.
 
         Args:

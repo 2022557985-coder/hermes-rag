@@ -1,6 +1,6 @@
 """Dense vector retrieval using ChromaDB."""
 
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 
 class DenseRetriever:
@@ -13,8 +13,8 @@ class DenseRetriever:
         self,
         query: str,
         top_k: int = 100,
-        filter_metadata: Optional[Dict[str, Any]] = None,
-    ) -> List[Dict[str, Any]]:
+        filter_metadata: dict[str, Any] | None = None,
+    ) -> list[dict[str, Any]]:
         """Retrieve chunks using dense vector search.
 
         Args:

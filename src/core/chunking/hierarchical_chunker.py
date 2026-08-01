@@ -1,7 +1,8 @@
 """Hierarchical chunking: heading-based sectioning + semantic splitting."""
 
 import re
-from typing import List, Dict, Any, Optional, Iterator
+from collections.abc import Iterator
+from typing import Any
 
 
 class HierarchicalChunker:
@@ -12,9 +13,9 @@ class HierarchicalChunker:
         chunk_size: int = 512,
         chunk_overlap: int = 128,
         semantic_threshold: float = 0.65,
-        min_chunk_size: int = 50,
+        min_chunk_size: int = 20,
         max_section_size: int = 512,
-        embedding_model: str = "BAAI/bge-small-en-v1.5",
+        embedding_model: str = "BAAI/bge-m3",
         embedding_device: str = "cpu",
     ):
         """Initialize the hierarchical chunker.
@@ -23,7 +24,7 @@ class HierarchicalChunker:
             chunk_size: Target chunk size in tokens.
             chunk_overlap: Overlap between adjacent chunks in tokens.
             semantic_threshold: Cosine similarity threshold for semantic splits.
-            min_chunk_size: Minimum tokens for a chunk.
+            min_chunk_size: Minimum tokens for a chunk (token count, not character count).
             max_section_size: Max section tokens before triggering semantic split.
             embedding_model: SentenceTransformer model name for semantic chunking.
             embedding_device: Device for semantic chunker model ('cpu' or 'cuda').
@@ -52,9 +53,9 @@ class HierarchicalChunker:
         self,
         text: str,
         source_name: str = "",
-        page_num: Optional[int] = None,
-        headings: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[Dict[str, Any]]:
+        page_num: int | None = None,
+        headings: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
         """Chunk a document into hierarchical chunks with metadata.
 
         Args:
@@ -82,6 +83,7 @@ class HierarchicalChunker:
                     section["heading"]["title"],
                 )
 
+            heading_path = meta_builder.get_heading_path()
             section_text = section["text"]
 
             # Step 2: If section is too large, use semantic split
@@ -93,7 +95,10 @@ class HierarchicalChunker:
 
             # Step 3: Apply overlap-based chunking to each sub-chunk
             for sub_text in sub_chunks:
-                if len(sub_text.strip()) < self.min_chunk_size:
+                # Attach the full heading path so heading-only signals are
+                # searchable and section context participates in retrieval.
+                sub_text = self._with_heading_prefix(sub_text, heading_path)
+                if self._estimate_tokens(sub_text.strip()) < self.min_chunk_size:
                     continue
 
                 sub_token_count = self._estimate_tokens(sub_text)
@@ -126,11 +131,32 @@ class HierarchicalChunker:
 
         return chunks
 
+    @staticmethod
+    def _with_heading_prefix(text: str, heading_path: str) -> str:
+        """Prepend the section heading path so titles participate in retrieval.
+
+        Chunk text is indexed by both BM25 and the embedding model, but the raw
+        section body excludes the markdown heading line. Prefixing the full
+        heading path makes short heading-driven sections (e.g. \"随机森林\")
+        searchable and keeps section context (e.g. \"监督学习详解 > 分类问题\").
+
+        Args:
+            text: Section body text.
+            heading_path: Full heading path (empty when no heading exists).
+
+        Returns:
+            Text with the heading path prefixed when one exists.
+        """
+        heading_path = (heading_path or "").strip()
+        if not heading_path or not text:
+            return text
+        return f"{heading_path} - {text}"
+
     def _split_by_headings(
         self,
         text: str,
-        headings: Optional[List[Dict[str, Any]]] = None,
-    ) -> List[Dict[str, Any]]:
+        headings: list[dict[str, Any]] | None = None,
+    ) -> list[dict[str, Any]]:
         """Split text into sections based on heading markers.
 
         If headings are pre-extracted, use them. Otherwise, detect # style headings.

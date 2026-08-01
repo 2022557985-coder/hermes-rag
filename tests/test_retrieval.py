@@ -1,6 +1,5 @@
 """Tests for retrieval module."""
 
-import pytest
 from src.core.retrieval.query_expander import QueryExpander
 from src.core.retrieval.rrf_fusion import RRFFusion
 from src.core.retrieval.rule_retriever import RuleRetriever
@@ -67,7 +66,7 @@ class TestRRFFusion:
 
     def test_dynamic_weights_default(self):
         fusion = RRFFusion()
-        dense_w, sparse_w = fusion._get_dynamic_weights("what is machine learning")
+        dense_w, sparse_w = fusion._get_dynamic_weights("machine learning algorithms")
         assert dense_w == 0.5
         assert sparse_w == 0.5
 

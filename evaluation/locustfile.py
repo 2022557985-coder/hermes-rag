@@ -1,6 +1,6 @@
 """Locust stress test for Hermes-RAG API."""
 
-from locust import HttpUser, task, between
+from locust import HttpUser, between, task
 
 
 class HermesRAGUser(HttpUser):

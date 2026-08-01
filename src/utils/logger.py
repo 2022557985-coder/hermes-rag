@@ -1,7 +1,6 @@
 """Logging utilities for Hermes-RAG."""
 
 import logging
-import os
 import sys
 from pathlib import Path
 

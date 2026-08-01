@@ -2,7 +2,7 @@
 
 import json
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
 
 class EvaluationDataset:
@@ -12,22 +12,22 @@ class EvaluationDataset:
         if not data_path:
             data_path = str(Path(__file__).parent / "data" / "ground_truth.json")
         self.data_path = data_path
-        self._data: List[Dict[str, Any]] = []
+        self._data: list[dict[str, Any]] = []
 
-    def load(self) -> List[Dict[str, Any]]:
+    def load(self) -> list[dict[str, Any]]:
         """Load the ground truth dataset.
 
         Returns:
             List of dicts with keys: query, relevant_chunk_ids, category.
         """
         try:
-            with open(self.data_path, "r", encoding="utf-8") as f:
+            with open(self.data_path, encoding="utf-8") as f:
                 self._data = json.load(f)
         except FileNotFoundError:
             self._data = self._generate_sample_data()
         return self._data
 
-    def _generate_sample_data(self) -> List[Dict[str, Any]]:
+    def _generate_sample_data(self) -> list[dict[str, Any]]:
         """Generate a sample evaluation dataset for testing."""
         return [
             {
@@ -82,13 +82,13 @@ class EvaluationDataset:
             },
         ]
 
-    def get_queries(self) -> List[str]:
+    def get_queries(self) -> list[str]:
         """Get all queries from the dataset."""
         if not self._data:
             self.load()
         return [item["query"] for item in self._data]
 
-    def get_relevant_ids(self, query: str) -> List[str]:
+    def get_relevant_ids(self, query: str) -> list[str]:
         """Get relevant chunk IDs for a query."""
         if not self._data:
             self.load()

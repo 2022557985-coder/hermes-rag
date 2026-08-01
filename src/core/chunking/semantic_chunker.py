@@ -1,6 +1,5 @@
 """Semantic chunking based on sentence embedding similarity."""
 
-from typing import List, Optional
 import numpy as np
 
 
@@ -11,7 +10,7 @@ class SemanticChunker:
         self,
         threshold: float = 0.65,
         min_chunk_size: int = 50,
-        model_name: str = "BAAI/bge-small-en-v1.5",
+        model_name: str = "BAAI/bge-m3",
         device: str = "cpu",
     ):
         """Initialize the semantic chunker.
@@ -35,10 +34,11 @@ class SemanticChunker:
             self._embedder = SentenceTransformer(
                 self.model_name,
                 device=self.device,
+                local_files_only=True,
             )
         return self._embedder
 
-    def split(self, text: str) -> List[str]:
+    def split(self, text: str) -> list[str]:
         """Split text into semantically coherent chunks.
 
         Args:
@@ -78,14 +78,14 @@ class SemanticChunker:
 
         return chunks
 
-    def _split_sentences(self, text: str) -> List[str]:
+    def _split_sentences(self, text: str) -> list[str]:
         """Split text into sentences."""
         import re
         pattern = r"(?<=[。！？.!?\n])\s*"
         sentences = re.split(pattern, text)
         return [s.strip() for s in sentences if s.strip()]
 
-    def _find_split_points(self, embeddings: np.ndarray) -> List[int]:
+    def _find_split_points(self, embeddings: np.ndarray) -> list[int]:
         """Find semantic split points based on similarity valleys.
 
         Args:

@@ -1,6 +1,6 @@
 """Metadata builder for chunks."""
 
-from typing import Dict, Any, Optional
+from typing import Any
 
 
 class MetadataBuilder:
@@ -16,13 +16,19 @@ class MetadataBuilder:
             self._heading_stack.pop()
         self._heading_stack.append((level, title))
 
+    def get_heading_path(self) -> str:
+        """Return the current heading path joined with ' > ' (empty if none)."""
+        if not self._heading_stack:
+            return ""
+        return " > ".join(title for _, title in self._heading_stack)
+
     def build_metadata(
         self,
         source_name: str = "",
-        page_num: Optional[int] = None,
+        page_num: int | None = None,
         chunk_index: int = 0,
-        extra: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        extra: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
         """Build metadata dict for a chunk.
 
         Args:

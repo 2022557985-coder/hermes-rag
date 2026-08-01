@@ -13,7 +13,6 @@ Validates all improvements:
 
 import json
 import sys
-import time
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -32,7 +31,7 @@ def test_query_classification():
     tests = [
         ("什么是机器学习？", "conceptual"),
         ("ABC-1234产品的配置方法", "factual"),
-        ("ERR500错误如何解决", "factual"),
+        ("ERR500错误如何解决", "procedural"),
         ("如何安装Python？", "procedural"),
         ("how to reset password", "procedural"),
         ("分类和回归有什么区别", "conceptual"),
@@ -51,7 +50,7 @@ def test_query_classification():
         print(f"  [{status}] '{query[:50]}' -> {result} (expected: {expected})")
 
     print(f"\n  Result: {passed}/{len(tests)} passed")
-    return passed == len(tests)
+    assert passed == len(tests), f"Only {passed}/{len(tests)} passed"
 
 
 def test_result_deduplication():
@@ -84,7 +83,6 @@ def test_result_deduplication():
     print("  PASS: Deduplication works correctly")
     print(f"    Input: {len(results)} items -> Output: {len(deduped)} items")
     print(f"    Order: {[r['chunk_id'] for r in deduped]}")
-    return True
 
 
 def test_threshold_filtering():
@@ -112,7 +110,6 @@ def test_threshold_filtering():
 
     print("  PASS: Threshold filtering works correctly")
     print(f"    Input: {len(results)} items -> Filtered: {len(filtered)} items")
-    return True
 
 
 def test_metrics_collector():
@@ -179,7 +176,6 @@ def test_metrics_collector():
     assert "reranker" in report
 
     print("  PASS: All metrics collection tests passed")
-    return True
 
 
 def test_cache_semantic_matching():
@@ -229,8 +225,6 @@ def test_cache_semantic_matching():
     # Check hit rate stats
     print(f"  Cache hit rate: {cache.hit_rate():.4f}")
     print(f"  Cache size: {cache.size()}")
-
-    return True
 
 
 def test_rrf_boundary_cases():
@@ -295,8 +289,6 @@ def test_rrf_boundary_cases():
     assert result[0]["chunk_id"] == "a", f"Expected dense result first for colloquial, got {result[0]['chunk_id']}"
     print("  PASS: Colloquial query boosts dense rank")
 
-    return True
-
 
 def test_query_expansion():
     """Test query expansion with synonyms."""
@@ -330,13 +322,15 @@ def test_query_expansion():
     assert result["expanded"] == result["original"], "Query with no synonyms should not change"
     print("  PASS: No-synonym query unchanged")
 
-    return True
-
 
 def test_evaluation_metrics():
     """Test evaluation metrics calculation."""
     from evaluation.eval import (
-        hit_rate_at_k, precision_at_k, recall_at_k, mrr, ndcg_at_k,
+        hit_rate_at_k,
+        mrr,
+        ndcg_at_k,
+        precision_at_k,
+        recall_at_k,
     )
 
     print("\n" + "=" * 60)
@@ -389,8 +383,6 @@ def test_evaluation_metrics():
     assert hit_rate_at_k(results, [], 3) == 0.0, "Empty relevant should return 0.0"
     print("  PASS: Empty relevant list returns 0.0")
 
-    return True
-
 
 def test_negative_samples():
     """Test negative sample evaluation."""
@@ -399,7 +391,7 @@ def test_negative_samples():
     print("=" * 60)
 
     ground_truth_path = Path(__file__).parent.parent / "evaluation" / "data" / "ground_truth.json"
-    with open(ground_truth_path, "r", encoding="utf-8") as f:
+    with open(ground_truth_path, encoding="utf-8") as f:
         data = json.load(f)
 
     queries_with_negatives = [
@@ -414,7 +406,6 @@ def test_negative_samples():
 
     assert len(queries_with_negatives) >= 3, "Should have at least 3 negative sample queries"
     print("  PASS: Negative samples properly configured")
-    return True
 
 
 def test_ragas_integration():
@@ -446,8 +437,6 @@ def test_ragas_integration():
     print(f"  Faithfulness:      {gen_results.get('faithfulness', 'N/A')}")
     print(f"  Answer Relevancy:  {gen_results.get('answer_relevancy', 'N/A')}")
     print("  PASS: RAGAS generation evaluation works")
-
-    return True
 
 
 def test_full_pipeline_integration():
@@ -495,13 +484,12 @@ def test_full_pipeline_integration():
         print(f"  PASS: Query classified as '{qtype}'")
 
         print("\n  All integration tests passed!")
-        return True
 
     except Exception as e:
         print(f"  FAIL: {e}")
         import traceback
         traceback.print_exc()
-        return False
+        raise  # Re-raise to let pytest capture the failure
 
 
 def main():

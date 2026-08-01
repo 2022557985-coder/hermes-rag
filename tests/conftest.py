@@ -1,5 +1,6 @@
 """Pytest fixtures for Hermes-RAG tests."""
 
+import gc
 import os
 import sys
 import tempfile
@@ -9,6 +10,28 @@ import pytest
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
+
+# Add local packages directory for rank_bm25
+_local_pkg = Path(__file__).parent.parent / "local_packages"
+if _local_pkg.exists():
+    sys.path.insert(0, str(_local_pkg))
+
+# Use lightweight embedding model for tests to reduce memory (16GB machines)
+os.environ.setdefault("HERMES_EMBEDDING_MODEL_NAME", "all-MiniLM-L6-v2")
+
+
+def pytest_configure(config):
+    """Register custom markers."""
+    config.addinivalue_line("markers", "slow: marks tests as slow (deselect with '-m \"not slow\"')")
+    config.addinivalue_line("markers", "integration: marks tests as integration tests")
+    config.addinivalue_line("markers", "heavy: marks tests that require significant memory/resources")
+
+
+@pytest.fixture(autouse=True)
+def _cleanup_after_test():
+    """Auto-cleanup: garbage collect after each test to manage memory."""
+    yield
+    gc.collect()
 
 
 @pytest.fixture
@@ -117,7 +140,7 @@ def sample_config():
         "sparse_top_k": 100,
         "fusion_top_k": 50,
         "reranking": {
-            "enabled": True,
+            "enabled": False,
             "timeout_seconds": 1.5,
         },
     }
@@ -126,5 +149,5 @@ def sample_config():
 @pytest.fixture
 def temp_dir():
     """Create a temporary directory."""
-    with tempfile.TemporaryDirectory() as tmpdir:
+    with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as tmpdir:
         yield tmpdir

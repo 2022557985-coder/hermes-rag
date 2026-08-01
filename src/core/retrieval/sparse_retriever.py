@@ -1,6 +1,6 @@
 """Sparse BM25 retrieval."""
 
-from typing import List, Dict, Any
+from typing import Any
 
 
 class SparseRetriever:
@@ -9,7 +9,7 @@ class SparseRetriever:
     def __init__(self, index_manager):
         self.index_manager = index_manager
 
-    def retrieve(self, query: str, top_k: int = 100) -> List[Dict[str, Any]]:
+    def retrieve(self, query: str, top_k: int = 100) -> list[dict[str, Any]]:
         """Retrieve chunks using BM25 sparse search.
 
         Args:

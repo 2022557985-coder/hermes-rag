@@ -7,7 +7,7 @@
 Hermes-RAG 的检索流水线分为五个阶段：
 
 ```
-用户查询 → 查询扩展 → 并行多路召回 → RRF 融合 → 重排序 → 结果返回
+用户查询 → 查询扩展 → 并行多路召回 → RRF 融合 → 可选重排 → 结果返回
 ```
 
 ### 1.2 模块详解
@@ -37,26 +37,28 @@ Hermes-RAG 的检索流水线分为五个阶段：
 - `chunk_size`: 512 tokens
 - `chunk_overlap`: 128 tokens
 - `semantic_threshold`: 0.65（余弦相似度阈值）
-- `min_chunk_size`: 50 tokens
+- `min_chunk_size`: 20 tokens（按 token 计数；chunk 文本会前缀完整标题路径）
 
 #### 双索引架构（Indexing）
 
 **稠密向量索引（VectorStore）**：
 - 基于 ChromaDB，使用 HNSW 算法
-- 嵌入模型：BAAI/bge-small-en-v1.5（384维）
+- 嵌入模型：BAAI/bge-m3（1024 维，多语言）
 - 索引参数：`ef_construction=100, M=8`
 
 **稀疏 BM25 索引（BM25Index）**：
-- 基于 rank_bm25 实现
+- 基于 rank_bm25 实现（缺失时使用内置纯 Python 回退）
 - 中文分词：jieba；英文分词：nltk
-- 超过 10万条目时自动降级到 SQLite 存储
+- 支持 SQLite 持久化（`bm25.persist: true`），跨进程保留稀疏索引
+- 超过 10万条目时自动迁移到 SQLite 存储
 
-**IndexManager** 协调双索引的并行写入和查询，通过 Chunk ID 关联。
+**IndexManager** 协调双索引的并行写入和查询，通过 Chunk ID 关联。启动时执行健康检查：向量维度变化、稀疏索引为空或索引版本升级时，从 DocumentStore 自动重建全部索引。
 
 #### 多路检索（Retrieval）
 
 **查询扩展（QueryExpander）**：
-- 同义词扩展：WordNet（英文）+ 内置中文同义词词典
+- 同义词扩展：WordNet（英文）+ 内置中文同义词词典（含 80+ 组 ML/IT 领域术语）
+- 混合策略：稠密路径使用原始查询，稀疏路径使用扩展查询，避免扩展噪声破坏向量排序
 - HyDE（默认关闭）：使用 T5-small 生成假设文档嵌入
 
 **并行召回**：
@@ -70,10 +72,10 @@ Hermes-RAG 的检索流水线分为五个阶段：
 
 #### 重排序（Reranking）
 
-- 模型：BAAI/bge-reranker-base
-- 对 Top-50 候选逐对打分
-- 超时保护：1.5 秒超时降级为 RRF 结果
-- 惰性加载：仅在检索时加载模型
+- 默认关闭：RRF 融合排序为最强变体（`reranking.enabled: false`）
+- 可选启发式重排：关键词重叠 + 标题匹配 + 位置信号，原始 RRF 分先归一化到 [0,1] 再加权，避免分数尺度不一致
+- 可选 Cross-Encoder：BAAI/bge-reranker-v2-m3，对 Top-50 候选逐对打分
+- 超时保护：超时降级为 RRF 结果；惰性加载：仅在检索时加载模型
 
 #### LLM 生成（Generation）
 
@@ -132,7 +134,7 @@ if similarity > 0.95 → 返回缓存结果
 
 ```python
 class EmbeddingConfig(BaseModel):
-    model_name: str = "BAAI/bge-small-en-v1.5"
+    model_name: str = "BAAI/bge-m3"
     device: str = "cpu"
     normalize: bool = True
     batch_size: int = 32
@@ -149,7 +151,7 @@ class EmbeddingConfig(BaseModel):
 | 索引构建 | < 100 docs/s | 含嵌入生成 |
 | 单次查询延迟 | < 1.5s | 含重排序 |
 | 内存占用 | < 3GB | 含所有模型 |
-| Hit Rate@5 | > 90% | 与基准对比 |
+| Hit Rate@5 | 100.0%（40 条查询） | 默认 RRF 变体，`run_eval.py` 实测 |
 
 ## 五、扩展指南
 

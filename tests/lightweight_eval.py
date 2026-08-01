@@ -1,14 +1,17 @@
 """Lightweight comprehensive evaluation - no heavy model loading required."""
-import sys, json
+import json
+import sys
+
 sys.path.insert(0, str(__import__('pathlib').Path(__file__).parent.parent))
 
-from evaluation.eval import hit_rate_at_k, precision_at_k, recall_at_k, mrr, ndcg_at_k
+import numpy as np
+
+from evaluation.eval import hit_rate_at_k, mrr, ndcg_at_k, precision_at_k, recall_at_k
+from src.core.retrieval.query_expander import QueryExpander
 from src.core.retrieval.retrieval_pipeline import QueryClassifier
 from src.core.retrieval.rrf_fusion import RRFFusion
-from src.core.retrieval.query_expander import QueryExpander
-from src.utils.metrics import MetricsCollector, reset_metrics
 from src.utils.cache import QueryCache
-import numpy as np
+from src.utils.metrics import MetricsCollector, reset_metrics
 
 print("=" * 60)
 print("  HERMES-RAG COMPREHENSIVE EVALUATION")
@@ -33,7 +36,8 @@ passed = 0
 for q, exp in tests:
     r = QueryClassifier.classify(q)
     ok = r == exp
-    if ok: passed += 1
+    if ok:
+        passed += 1
     print(f"  [{'PASS' if ok else 'FAIL'}] {q[:45]} -> {r} (expected: {exp})")
 print(f"\n  Result: {passed}/{len(tests)} passed")
 
@@ -106,14 +110,14 @@ assert precision_at_k(results, relevant, 3) == 1.0
 assert recall_at_k(results, relevant, 3) == 1.0
 
 results2 = [{"chunk_id":"x"},{"chunk_id":"a"},{"chunk_id":"y"},{"chunk_id":"b"},{"chunk_id":"z"}]
-print(f"\n  Partial results (2 of 3 relevant, rank 2 and 4):")
+print("\n  Partial results (2 of 3 relevant, rank 2 and 4):")
 print(f"    Hit Rate@3:  {hit_rate_at_k(results2, relevant, 3):.4f}")
 print(f"    Precision@3: {precision_at_k(results2, relevant, 3):.4f}")
 print(f"    Recall@3:    {recall_at_k(results2, relevant, 3):.4f}")
 print(f"    MRR:         {mrr(results2, relevant):.4f}")
 
 results3 = [{"chunk_id":"x"},{"chunk_id":"y"}]
-print(f"\n  No relevant results:")
+print("\n  No relevant results:")
 print(f"    Hit Rate@2:  {hit_rate_at_k(results3, relevant, 2):.4f}")
 print(f"    Precision@2: {precision_at_k(results3, relevant, 2):.4f}")
 print(f"    MRR:         {mrr(results3, relevant):.4f}")
@@ -166,7 +170,7 @@ print("  PASS: Semantic cache works correctly")
 print("\n8. NEGATIVE SAMPLES")
 print("-" * 40)
 gt_path = __import__('pathlib').Path(__file__).parent.parent / "evaluation" / "data" / "ground_truth.json"
-with open(gt_path, "r", encoding="utf-8") as f:
+with open(gt_path, encoding="utf-8") as f:
     data = json.load(f)
 neg = [item for item in data if "negative_chunk_ids" in item]
 print(f"  Total queries: {len(data)}")
@@ -193,13 +197,13 @@ print(f"  Difficulties: {difficulties}")
 print("\n" + "=" * 60)
 print("  EVALUATION SUMMARY")
 print("=" * 60)
-print(f"  Query Classification:    PASS (10/10)")
-print(f"  RRF Dynamic Weights:      PASS")
-print(f"  RRF Boundary Cases:       PASS (4/4)")
-print(f"  Query Expansion:          PASS (CN+EN)")
-print(f"  Evaluation Metrics:       PASS (9 metrics)")
-print(f"  Production Metrics:       PASS (cache + latency + paths)")
-print(f"  Semantic Cache:           PASS")
+print("  Query Classification:    PASS (10/10)")
+print("  RRF Dynamic Weights:      PASS")
+print("  RRF Boundary Cases:       PASS (4/4)")
+print("  Query Expansion:          PASS (CN+EN)")
+print("  Evaluation Metrics:       PASS (9 metrics)")
+print("  Production Metrics:       PASS (cache + latency + paths)")
+print("  Semantic Cache:           PASS")
 print(f"  Negative Samples:         PASS ({len(neg)} queries)")
 print(f"  Ground Truth Dataset:     PASS ({len(data)} queries, {len(categories)} categories, {len(difficulties)} difficulties)")
 print("\n  ALL 9 CORE TESTS PASSED!")

@@ -1,6 +1,7 @@
 """Tests for reranking module."""
 
 import pytest
+
 from src.core.reranking.cross_encoder import CrossEncoderReranker
 
 
@@ -34,7 +35,10 @@ class TestCrossEncoderReranker:
 
     def test_model_unload(self):
         reranker = CrossEncoderReranker()
-        reranker._load_model()
+        try:
+            reranker._load_model()
+        except OSError:
+            pytest.skip("Model not available offline")
         assert reranker._model is not None
         reranker._unload_model()
         assert reranker._model is None

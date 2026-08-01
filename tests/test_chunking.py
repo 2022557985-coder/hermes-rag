@@ -1,6 +1,5 @@
 """Tests for chunking module."""
 
-import pytest
 from src.core.chunking.hierarchical_chunker import HierarchicalChunker
 from src.core.chunking.metadata_builder import MetadataBuilder
 
@@ -42,12 +41,13 @@ class TestMetadataBuilder:
         builder = MetadataBuilder()
         builder.update_heading(1, "Chapter 1")
         builder.update_heading(2, "Section 1.1")
-        # New level 1 heading should replace the old one
+        # New level 1 heading pops both levels, stack now has only [Chapter 2]
         builder.update_heading(1, "Chapter 2")
 
         meta = builder.build_metadata(source_name="doc.md", chunk_index=0)
         assert meta["heading_level_1"] == "Chapter 2"
-        assert meta["heading_level_2"] == ""
+        # heading_level_2 should not exist since stack only has 1 item
+        assert "heading_level_2" not in meta
 
 
 class TestHierarchicalChunker:

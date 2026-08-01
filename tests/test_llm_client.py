@@ -1,7 +1,7 @@
 """Tests for LLM client with mocked HTTP responses."""
 
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
 from src.core.generation.llm_client import LLMClient
 
 
@@ -63,7 +63,7 @@ class TestLLMClient:
 
         client = LLMClient(provider="ollama")
         result = client.generate("test", [{"text": "test", "metadata": {}}])
-        assert "[LLM Error: Connection failed" in result
+        assert "[LLM Error:" in result and "Connection refused" in result
 
     @patch("requests.post")
     def test_generate_ollama_timeout(self, mock_post):
@@ -72,7 +72,7 @@ class TestLLMClient:
 
         client = LLMClient(provider="ollama")
         result = client.generate("test", [{"text": "test", "metadata": {}}])
-        assert "[LLM Error: Request timed out" in result
+        assert "[LLM Error:" in result and "timed out" in result.lower()
 
     @patch("requests.post")
     def test_generate_ollama_http_error(self, mock_post):
@@ -84,7 +84,7 @@ class TestLLMClient:
 
         client = LLMClient(provider="ollama")
         result = client.generate("test", [{"text": "test", "metadata": {}}])
-        assert "[LLM Error: HTTP 500" in result
+        assert "[LLM Error:" in result and "500" in result
 
     @patch("requests.post")
     def test_generate_openai_success(self, mock_post):
@@ -106,7 +106,7 @@ class TestLLMClient:
 
         client = LLMClient(provider="openai", api_key="sk-test")
         result = client.generate("test", [{"text": "test", "metadata": {}}])
-        assert "[LLM Error: Connection failed" in result
+        assert "[LLM Error:" in result and "Connection refused" in result
 
     @patch("requests.post")
     def test_generate_openai_invalid_response(self, mock_post):
@@ -117,7 +117,7 @@ class TestLLMClient:
 
         client = LLMClient(provider="openai", api_key="sk-test")
         result = client.generate("test", [{"text": "test", "metadata": {}}])
-        assert "[LLM Error: Invalid response format" in result
+        assert "[LLM Error:" in result and "Malformed JSON" in result
 
     @patch("requests.post")
     def test_generate_ollama_stream(self, mock_post):

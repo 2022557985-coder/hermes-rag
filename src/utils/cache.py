@@ -2,7 +2,6 @@
 
 import hashlib
 import time
-from typing import Optional
 
 import numpy as np
 
@@ -38,7 +37,7 @@ class QueryCache:
             return 0.0
         return float(np.dot(a, b) / (np.linalg.norm(a) * np.linalg.norm(b) + 1e-10))
 
-    def get(self, query: str, query_embedding: Optional[np.ndarray] = None) -> Optional[list]:
+    def get(self, query: str, query_embedding: np.ndarray | None = None) -> list | None:
         """Look up cached results by query or semantic similarity.
 
         Args:
@@ -82,7 +81,7 @@ class QueryCache:
 
         return None
 
-    def set(self, query: str, results: list, query_embedding: Optional[np.ndarray] = None) -> None:
+    def set(self, query: str, results: list, query_embedding: np.ndarray | None = None) -> None:
         """Cache results for a query.
 
         Args:
@@ -118,3 +117,15 @@ class QueryCache:
         if self._total_accesses == 0:
             return 0.0
         return self._hits / self._total_accesses
+
+    def get_stats(self) -> dict:
+        """Return cache statistics for monitoring and the UI."""
+        return {
+            "size": self.size(),
+            "max_size": self._max_size,
+            "hits": self._hits,
+            "total_accesses": self._total_accesses,
+            "hit_rate": self.hit_rate(),
+            "similarity_threshold": self._similarity_threshold,
+            "ttl_seconds": self._ttl_seconds,
+        }

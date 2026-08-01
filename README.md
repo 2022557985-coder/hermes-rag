@@ -1,242 +1,156 @@
 # Hermes-RAG
 
-轻量级、高精度 RAG 检索优化框架，专为本地化部署设计。
+轻量级、可本地化部署的企业级 RAG（检索增强生成）框架，面向 8GB RAM / 4 核 CPU 的开发与生产环境。
 
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://python.org)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-0f766e.svg)](.github/workflows/ci.yml)
 
-## 概述
+## 实测性能
 
-Hermes-RAG 是一套可完全本地化部署的 RAG（检索增强生成）框架，在 **8GB RAM + 4核CPU** 的笔记本环境下，将检索命中率从默认的 65% 以下提升至 **90% 以上**。
+以下为当前评测集（40 条查询、11 篇文档、62 个 chunk）在 `BAAI/bge-m3` 嵌入模型下的可复现结果，完整报告见 [docs/evaluation_report.md](docs/evaluation_report.md)。
 
-### 核心特性
+| 检索变体 | H@1 | H@3 | H@5 | 文档H@5 | MRR | NDCG@10 | 平均延迟 |
+|---------|------|------|------|---------|------|---------|---------|
+| Dense baseline | 80.0% | 95.0% | 100.0% | 100.0% | 0.8821 | 0.8995 | 391ms |
+| Dense + BM25 RRF（默认） | 80.0% | 97.5% | 100.0% | 100.0% | 0.8883 | 0.9054 | 415ms |
+| RRF + 启发式重排 | 80.0% | 97.5% | 100.0% | 100.0% | 0.8883 | 0.9054 | 417ms |
 
-- **层级化分块**：标题层级切分 + 语义分割，保留文档结构信息
-- **双索引架构**：稠密向量（ChromaDB/HNSW）+ 稀疏 BM25 并行检索
-- **RRF 动态权重融合**：根据查询类型（产品型号/口语化）自动调整稠密/稀疏权重
-- **Cross-Encoder 重排序**：BGE-Reranker 精排，提升 Top-K 精度
-- **查询扩展**：同义词扩展 + 可选 HyDE（假设文档嵌入）
-- **规则引擎**：章节预过滤，支持产品型号等模式匹配
-- **语义缓存**：相似查询命中缓存，降低延迟
-- **多格式支持**：PDF、DOCX、PPTX、TXT、Markdown、网页
-- **资源友好**：CPU 推理、内存优化、SQLite 降级存储
-- **安全防护**：路径遍历保护、SSRF 防护、文件大小限制、API Key 认证
-- **生产就绪**：Docker 支持、速率限制、优雅关闭、线程安全配置
+难度拆解（默认 RRF 变体）: easy H@5 100.0% / medium H@5 100.0% / hard H@5 100.0%，40 条查询 Top-5 全部命中，chunk 级与文档级失败查询均为 0。
+
+> 说明：评测集以概念检索为主，上述数字用于版本回归对比与质量门槛验证；生产环境建议扩充领域评测集后以 `run_eval.py` 输出为准。
+
+## 核心特性
+
+- 层级化分块：标题层级切分 + 语义分割，章节标题路径写入 chunk 文本，短小节不再被误丢
+- 双索引架构：稠密向量（ChromaDB/HNSW）与稀疏 BM25 并行召回
+- 混合查询扩展：稠密走原始查询，稀疏走同义词扩展查询，避免扩展噪声破坏向量排序
+- RRF 动态权重融合：按查询类型（产品型号 / 口语化 / 默认）自动调整稠密/稀疏权重
+- 文档存储（DocumentStore）：SQLite 持久化 chunk，向量维度或索引版本变化时自动重建
+- BM25 SQLite 持久化：稀疏索引跨进程保留，`rank_bm25` 缺失时有纯 Python 回退
+- 保守的重排序策略：默认关闭，启发式重排器已修复分数尺度不一致问题
+- 查询扩展：ML 领域同义词扩展 + 可选 HyDE
+- 语义缓存：相似查询命中缓存，降低延迟
+- 多格式摄入：PDF、DOCX、PPTX、TXT、Markdown、网页
+- 安全防护：路径遍历保护、CSRF 防护、文件大小限制、API Key 认证
+- 生产就绪：FastAPI、Gradio 多标签页控制台、Docker、限流、优雅关闭
 
 ## 架构
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                    用户查询                           │
-└──────────────────────┬──────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  ① 查询扩展 (QueryExpander)                          │
-│     同义词扩展 + HyDE (可选)                          │
-└──────────────────────┬──────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  ② 并行多路召回 (Parallel Retrieval)                  │
-│  ┌──────────────┐  ┌──────────────┐  ┌───────────┐  │
-│  │ Dense (HNSW) │  │ BM25 (稀疏)  │  │ Rule 引擎  │  │
-│  │   Top-100    │  │   Top-100    │  │ 章节过滤   │  │
-│  └──────┬───────┘  └──────┬───────┘  └─────┬─────┘  │
-└─────────┼─────────────────┼───────────────┼────────┘
-          └─────────┬───────┘               │
-                    ▼                       │
-┌─────────────────────────────────────────────────────┐
-│  ③ RRF 动态权重融合 (RRFFusion)                       │
-│     稠密/稀疏加权 → Top-50                            │
-└──────────────────────┬──────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  ④ Cross-Encoder 重排序 (BGE-Reranker)               │
-│     候选精排 → Top-5                                  │
-└──────────────────────┬──────────────────────────────┘
-                       ▼
-┌─────────────────────────────────────────────────────┐
-│  ⑤ 结果返回 + 可选 LLM 生成                           │
-└─────────────────────────────────────────────────────┘
+用户查询 → 查询扩展 → 并行多路召回 → RRF 融合 → 可选重排 → 结果返回
+                            │
+        ┌───────────────────┼───────────────────┐
+        ▼                   ▼                   ▼
+   Dense (HNSW)        BM25 (SQLite)      DocumentStore
+   ChromaDB            rank_bm25/回退     SQLite 事实源
+   原始查询              扩展查询
 ```
+
+三个存储由 `IndexManager` 协调：文档入库时并行写入向量库、BM25 与文档存储；启动时执行索引健康检查，向量维度变化、稀疏索引为空或索引版本升级时从文档存储自动重建。
 
 ## 快速开始
 
-### 环境要求
-
-- Python 3.10+
-- 8GB+ RAM（推荐 16GB）
-- Windows / macOS / Linux
-
-### 安装
-
 ```bash
-# 克隆项目
-cd hermes_rag
+# 安装依赖
+pip install -r requirements.txt
 
-# 安装依赖（推荐使用 Poetry）
-pip install poetry
-poetry install
+# 摄入文档（文件或目录）
+python cli.py ingest evaluation/data/sample_docs/
 
-# 或使用 pip
-pip install -e .
-```
+# 检索
+python cli.py query "什么是机器学习？" --top-k 5
 
-### Docker 部署
-
-```bash
-# 构建镜像
-docker build -t hermes-rag .
-
-# 运行容器
-docker run -p 8000:8000 \
-  -v $(pwd)/data:/app/data \
-  -v $(pwd)/config.yaml:/app/config.yaml \
-  -e HERMES_API_KEY=your-secret-key \
-  hermes-rag
-```
-
-### 配置
-
-```bash
-# 复制环境变量模板
-cp .env.example .env
-
-# 编辑配置文件（可选，默认配置已可用）
-# config.yaml
-```
-
-### 首次运行
-
-首次运行时会自动下载模型（约 130MB），请保持网络畅通。
-
-```bash
-# 摄入文档
-python cli.py ingest ./evaluation/data/sample_docs/
-
-# 查询
-python cli.py query "什么是机器学习？"
-
-# 启动 API 服务
+# 启动 API 服务（端口 8000）
 python cli.py serve
 
-# 启动 Web 界面
+# 启动可视化控制台（端口 7860）
 python cli.py ui
 ```
+
+控制台包含四个工作区：对话、检索实验、评估看板、系统状态。
 
 ## CLI 使用
 
 ```bash
-# 摄入文档
-python cli.py ingest <路径或URL>        # 摄入单个文件或整个目录
-
-# 查询
-python cli.py query "你的问题"           # 默认返回 Top-5
-python cli.py query "你的问题" --top-k 10  # 返回 Top-10
-python cli.py query "你的问题" --no-reranker  # 禁用重排序
-python cli.py query "你的问题" --format json  # JSON 格式输出
-
-# 启动服务
-python cli.py serve                      # 启动 FastAPI 服务 (端口 8000)
-python cli.py ui                         # 启动 Gradio Web 界面 (端口 7860)
+python cli.py ingest <路径或URL>         # 摄入单个文件或整个目录
+python cli.py query "问题"               # 默认返回 Top-5
+python cli.py query "问题" --top-k 10    # 返回 Top-10
+python cli.py query "问题" --no-reranker # 禁用重排序
+python cli.py query "问题" --format json # JSON 输出
+python cli.py serve                      # FastAPI 服务（端口 8000）
+python cli.py ui                         # Gradio 控制台（端口 7860）
 ```
-
 ## API 接口
 
 启动服务后访问 `http://localhost:8000/docs` 查看 Swagger 文档。
 
-### 认证
+认证：设置环境变量 `HERMES_API_KEY` 后，请求头需携带 `X-API-Key`。
 
-可通过环境变量 `HERMES_API_KEY` 启用 API Key 认证。启用后需要在请求头中携带 `X-API-Key`。
+| 端点 | 方法 | 说明 |
+|------|------|------|
+| `/api/v1/health` | GET | 健康检查与索引计数 |
+| `/api/v1/stats` | GET | 索引、缓存、指标与脱敏配置 |
+| `/api/v1/ingest` | POST | 摄入文件或 URL |
+| `/api/v1/query` | POST | 检索问答 |
+| `/api/v1/rebuild` | POST | 从文档存储重建向量与 BM25 索引 |
 
-### 健康检查
-
-```
-GET /api/v1/health
-```
-
-### 文档摄入
-
-```
-POST /api/v1/ingest
-{
-  "source": "/path/to/document.pdf"
-}
-```
-
-支持的文件类型：`.pdf`, `.docx`, `.pptx`, `.txt`, `.md`, `.csv`, `.json`
-
-### 检索查询
-
-```
+```json
 POST /api/v1/query
 {
   "query": "什么是机器学习？",
   "top_k": 5,
-  "use_reranker": true,
+  "use_reranker": false,
   "generate_answer": false
 }
 ```
 
-## 配置说明
-
-所有参数通过 `config.yaml` 管理，无需修改代码：
-
-| 模块 | 关键参数 | 说明 |
-|------|---------|------|
-| embedding | model_name, device | 嵌入模型选择与设备 |
-| chunking | chunk_size: 512, overlap: 128 | 分块大小与重叠 |
-| chromadb | hnsw_ef_construction, hnsw_M | HNSW 索引参数 |
-| bm25 | b, k1 | BM25 算法参数 |
-| retrieval | dense_top_k, sparse_top_k, rrf_k | 检索参数 |
-| reranking | enabled, model_name, timeout | 重排序配置 |
-| generation | provider, model | LLM 生成配置 |
-
 ## 评估
 
 ```bash
-# 运行评估
-python -m evaluation.eval
+# 可复现基准：构建临时索引并输出 JSON 报告
+python run_eval.py --output docs/eval_results.json
 
-# 基线对比
-python -m evaluation.eval --baseline
-
-# 输出 JSON 结果
-python -m evaluation.eval --output results.json
+# 指定变体（baseline / rrf / rerank / cross）
+python run_eval.py --variants baseline rrf rerank
 ```
 
-### 评估指标
+指标定义：Hit Rate@K（Top-K 命中）、MRR、NDCG@10、Precision@K、Recall@K，以及文档级 Hit Rate@K / Doc MRR。评估数据集位于 `evaluation/data/ground_truth.json`（40 条查询），所有 `relevant_chunk_ids` 均通过自动化测试校验必须真实存在于索引。
 
-- **Hit Rate@K**（K=1,3,5）：Top-K 结果中命中相关文档的比例
-- **MRR**（Mean Reciprocal Rank）：第一个相关文档排名的倒数均值
-- **NDCG@10**：归一化折损累计增益
+## 配置说明
+
+所有参数通过 `config.yaml` 管理，无需修改代码。
+
+| 模块 | 关键参数 | 说明 |
+|------|---------|------|
+| embedding | model_name, device | 嵌入模型与设备（默认 `BAAI/bge-m3`） |
+| chunking | chunk_size, min_chunk_size | 分块大小与最小 token 数（按 token 计，非字符） |
+| chromadb | persist_directory, hnsw_M | 向量库与 HNSW 参数 |
+| bm25 | persist, fallback_db_path | 稀疏索引持久化 |
+| retrieval | dense_top_k, sparse_top_k, rrf_k | 召回与融合参数 |
+| reranking | enabled, model_name | 重排序策略（默认关闭） |
+| generation | provider, model | LLM 后端（Ollama/OpenAI） |
 
 ## 项目结构
 
 ```
 hermes_rag/
-├── cli.py                          # 命令行入口
-├── config.yaml                     # 全局配置
-├── pyproject.toml                  # 依赖管理
-│
+├── cli.py                     # 命令行入口
+├── config.yaml                # 全局配置
+├── api/                       # FastAPI 服务
+├── ui/                        # Gradio 控制台
 ├── src/
-│   ├── config.py                   # Pydantic 配置加载
-│   ├── core/
-│   │   ├── ingestion/              # 文档解析（PDF/DOCX/PPTX/TXT/Web）
-│   │   ├── chunking/               # 层级化分块 + 语义分割
-│   │   ├── indexing/               # ChromaDB + BM25 双索引
-│   │   ├── retrieval/              # 多路召回 + RRF 融合
-│   │   ├── reranking/              # Cross-Encoder 重排序
-│   │   └── generation/             # LLM 客户端（OpenAI/Ollama）
-│   └── utils/                      # 日志、缓存、计时、内存监控
-│
-├── api/                            # FastAPI 服务
-├── ui/                             # Gradio Web 界面
-├── tests/                          # 测试套件
-├── evaluation/                     # 评估脚本与数据集
-│   └── data/
-│       ├── ground_truth.json       # 基准真值
-│       └── sample_docs/            # 示例文档
-└── docs/                           # 技术文档
+│   └── core/
+│       ├── ingestion/         # 文档解析（PDF/DOCX/PPTX/TXT/Web）
+│       ├── chunking/          # 层级化分块 + 语义分割
+│       ├── indexing/          # ChromaDB + BM25 + DocumentStore
+│       ├── retrieval/         # 多路召回 + RRF 融合
+│       ├── reranking/         # Cross-Encoder 重排序
+│       └── generation/        # LLM 客户端（OpenAI/Ollama）
+├── evaluation/                # 评测脚本与数据集
+├── docs/                      # 技术文档与评估报告
+├── tests/                     # 测试套件
+└── .github/workflows/         # CI
 ```
 
 ## 技术选型
@@ -244,11 +158,11 @@ hermes_rag/
 | 决策点 | 选择 | 原因 |
 |--------|------|------|
 | 向量数据库 | ChromaDB | 无独立进程、原生 Python、低内存 |
-| Embedding 模型 | bge-small-en-v1.5 | 384维、CPU推理 50ms/句 |
-| 稀疏检索 | rank_bm25 | 纯 Python、无外部依赖 |
-| 重排序 | bge-reranker-base | 200MB、精度提升显著 |
-| 融合算法 | 改进 RRF | 动态权重、k=60 |
-| LLM 接口 | OpenAI/Ollama | 可插拔、支持本地部署 |
+| 嵌入模型 | BAAI/bge-m3 | 1024 维多语言，中英文查询效果稳定 |
+| 稀疏检索 | rank_bm25 | 纯 Python，支持 SQLite 持久化 |
+| 重排序 | BAAI/bge-reranker-v2-m3 | 多语言跨编码器，默认关闭 |
+| 融合算法 | 改进 RRF | 动态权重，k=60 |
+| LLM 接口 | OpenAI / Ollama | 可插拔，支持本地部署 |
 
 ## License
 

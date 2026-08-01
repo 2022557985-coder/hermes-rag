@@ -1,7 +1,6 @@
 """Tests for document ingestion module."""
 
-import pytest
-from src.core.ingestion.parser_factory import ParserFactory, BaseParser
+from src.core.ingestion.parser_factory import ParserFactory
 
 
 class TestParserFactory:
@@ -47,7 +46,6 @@ class TestTextParser:
     """Tests for TextParser."""
 
     def test_parse_markdown_extracts_headings(self, sample_text, sample_docs_dir):
-        import tempfile
         from src.core.ingestion.text_parser import TextParser
 
         md_path = sample_docs_dir + "/test_sample.md"

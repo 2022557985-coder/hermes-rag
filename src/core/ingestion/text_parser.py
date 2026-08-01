@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 from .parser_factory import BaseParser
 
@@ -10,7 +10,7 @@ from .parser_factory import BaseParser
 class TextParser(BaseParser):
     """Parse plain text and Markdown files."""
 
-    def parse(self, source: str) -> Dict[str, Any]:
+    def parse(self, source: str) -> dict[str, Any]:
         """Parse a text or Markdown file.
 
         Args:
@@ -27,7 +27,7 @@ class TextParser(BaseParser):
         result = charset_normalizer.detect(raw)
         encoding = result["encoding"] or "utf-8"
 
-        with open(source, "r", encoding=encoding, errors="replace") as f:
+        with open(source, encoding=encoding, errors="replace") as f:
             content = f.read()
 
         ext = Path(source).suffix.lower()

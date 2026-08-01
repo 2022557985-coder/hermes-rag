@@ -1,7 +1,7 @@
 """Rule-based retriever for chapter/section indicators."""
 
 import re
-from typing import List, Dict, Any, Optional
+from typing import Any
 
 
 class RuleRetriever:
@@ -17,7 +17,7 @@ class RuleRetriever:
         r"Part\s+\d+",
     ]
 
-    def detect_chapter_hint(self, query: str) -> Optional[str]:
+    def detect_chapter_hint(self, query: str) -> str | None:
         """Detect chapter/section indicators in query.
 
         Args:
@@ -32,7 +32,7 @@ class RuleRetriever:
                 return match.group()
         return None
 
-    def build_filter(self, query: str) -> Optional[Dict[str, Any]]:
+    def build_filter(self, query: str) -> dict[str, Any] | None:
         """Build a metadata filter based on query content.
 
         Args:

@@ -125,8 +125,7 @@ print(response.json()["answer"])
 
 ```yaml
 embedding:
-  model_name: "BAAI/bge-small-en-v1.5"   # 英文
-  model_name_zh: "BAAI/bge-small-zh"     # 中文（按需切换）
+  model_name: "BAAI/bge-m3"   # 多语言，中英文统一使用
 ```
 
 ### 使用方式

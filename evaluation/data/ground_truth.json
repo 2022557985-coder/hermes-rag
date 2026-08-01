@@ -1,0 +1,492 @@
+[
+  {
+    "query": "什么是机器学习？",
+    "difficulty": "easy",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_intro.md_0"
+    ],
+    "relevant_doc_ids": [
+      "ml_intro.md"
+    ],
+    "negative_chunk_ids": [
+      "ml_intro.md_4"
+    ]
+  },
+  {
+    "query": "监督学习有哪些类型？",
+    "difficulty": "easy",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_supervised.md_1",
+      "ml_supervised.md_2"
+    ],
+    "relevant_doc_ids": [
+      "ml_supervised.md"
+    ]
+  },
+  {
+    "query": "什么是神经网络？",
+    "difficulty": "easy",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_neural.md_0"
+    ],
+    "relevant_doc_ids": [
+      "ml_neural.md"
+    ],
+    "negative_chunk_ids": [
+      "ml_neural.md_2"
+    ]
+  },
+  {
+    "query": "如何评估模型性能？",
+    "difficulty": "easy",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_eval.md_0"
+    ],
+    "relevant_doc_ids": [
+      "ml_eval.md"
+    ]
+  },
+  {
+    "query": "K-means是什么算法？",
+    "difficulty": "easy",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_clustering.md_1"
+    ],
+    "relevant_doc_ids": [
+      "ml_clustering.md"
+    ],
+    "negative_chunk_ids": [
+      "ml_clustering.md_3"
+    ]
+  },
+  {
+    "query": "Python的特点是什么？",
+    "difficulty": "easy",
+    "category": "python",
+    "relevant_chunk_ids": [
+      "py_basics.md_1",
+      "py_basics.md_2",
+      "py_basics.md_3",
+      "py_basics.md_4",
+      "py_basics.md_5",
+      "py_basics.md_6"
+    ],
+    "relevant_doc_ids": [
+      "py_basics.md"
+    ],
+    "negative_chunk_ids": [
+      "py_features.md_1"
+    ]
+  },
+  {
+    "query": "Python支持哪些编程范式？",
+    "difficulty": "easy",
+    "category": "python",
+    "relevant_chunk_ids": [
+      "py_features.md_1",
+      "py_features.md_2",
+      "py_features.md_3",
+      "py_features.md_4"
+    ],
+    "relevant_doc_ids": [
+      "py_features.md"
+    ]
+  },
+  {
+    "query": "分类和回归有什么区别？",
+    "difficulty": "easy",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_classification.md_6",
+      "ml_regression.md_6"
+    ],
+    "relevant_doc_ids": [
+      "ml_classification.md",
+      "ml_regression.md"
+    ],
+    "negative_chunk_ids": [
+      "ml_classification.md_1"
+    ]
+  },
+  {
+    "query": "CNN是什么架构？",
+    "difficulty": "easy",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_arch.md_0"
+    ],
+    "relevant_doc_ids": [
+      "ml_arch.md"
+    ]
+  },
+  {
+    "query": "交叉验证的作用是什么？",
+    "difficulty": "easy",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_cv.md_1",
+      "ml_cv.md_2",
+      "ml_cv.md_3",
+      "ml_cv.md_4"
+    ],
+    "relevant_doc_ids": [
+      "ml_cv.md"
+    ]
+  },
+  {
+    "query": "Python是解释型还是编译型？",
+    "difficulty": "easy",
+    "category": "python",
+    "relevant_chunk_ids": [
+      "py_basics.md_2",
+      "py_basics.md_0"
+    ],
+    "relevant_doc_ids": [
+      "py_basics.md"
+    ]
+  },
+  {
+    "query": "常见的CNN架构有哪些？",
+    "difficulty": "easy",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_arch.md_4"
+    ],
+    "relevant_doc_ids": [
+      "ml_arch.md"
+    ]
+  },
+  {
+    "query": "欠拟合是什么？",
+    "difficulty": "easy",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_eval.md_4"
+    ],
+    "relevant_doc_ids": [
+      "ml_eval.md"
+    ]
+  },
+  {
+    "query": "机器学习有哪些主要类型？",
+    "difficulty": "easy",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_intro.md_1",
+      "ml_intro.md_2",
+      "ml_intro.md_3"
+    ],
+    "relevant_doc_ids": [
+      "ml_intro.md"
+    ]
+  },
+  {
+    "query": "逻辑回归是分类算法还是回归算法？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_classification.md_2"
+    ],
+    "relevant_doc_ids": [
+      "ml_classification.md"
+    ]
+  },
+  {
+    "query": "K-means聚类算法有哪些局限性？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_clustering.md_1"
+    ],
+    "relevant_doc_ids": [
+      "ml_clustering.md"
+    ]
+  },
+  {
+    "query": "CNN中的卷积层有什么作用？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_arch.md_1"
+    ],
+    "relevant_doc_ids": [
+      "ml_arch.md"
+    ]
+  },
+  {
+    "query": "什么是过拟合？如何解决？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_eval.md_4"
+    ],
+    "relevant_doc_ids": [
+      "ml_eval.md"
+    ],
+    "negative_chunk_ids": [
+      "ml_cv.md_2"
+    ]
+  },
+  {
+    "query": "Python是解释型语言还是编译型语言？",
+    "difficulty": "medium",
+    "category": "python",
+    "relevant_chunk_ids": [
+      "py_basics.md_2",
+      "py_basics.md_0"
+    ],
+    "relevant_doc_ids": [
+      "py_basics.md"
+    ]
+  },
+  {
+    "query": "随机森林是如何工作的？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_classification.md_4"
+    ],
+    "relevant_doc_ids": [
+      "ml_classification.md"
+    ]
+  },
+  {
+    "query": "神经网络的激活函数有哪些？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_neural.md_1"
+    ],
+    "relevant_doc_ids": [
+      "ml_neural.md"
+    ]
+  },
+  {
+    "query": "K折交叉验证的步骤是什么？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_eval.md_3",
+      "ml_cv.md_5"
+    ],
+    "relevant_doc_ids": [
+      "ml_cv.md",
+      "ml_eval.md"
+    ]
+  },
+  {
+    "query": "Python的面向对象编程有哪些特性？",
+    "difficulty": "medium",
+    "category": "python",
+    "relevant_chunk_ids": [
+      "py_features.md_1"
+    ],
+    "relevant_doc_ids": [
+      "py_features.md"
+    ]
+  },
+  {
+    "query": "什么是深度学习中的反向传播？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_neural.md_4"
+    ],
+    "relevant_doc_ids": [
+      "ml_neural.md"
+    ]
+  },
+  {
+    "query": "决策树和随机森林的关系是什么？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_classification.md_3",
+      "ml_classification.md_4"
+    ],
+    "relevant_doc_ids": [
+      "ml_classification.md"
+    ]
+  },
+  {
+    "query": "线性回归的基本原理是什么？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_regression.md_2"
+    ],
+    "relevant_doc_ids": [
+      "ml_regression.md"
+    ]
+  },
+  {
+    "query": "岭回归和Lasso回归有什么作用？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_regression.md_4"
+    ],
+    "relevant_doc_ids": [
+      "ml_regression.md"
+    ]
+  },
+  {
+    "query": "什么是决策树回归？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_regression.md_5"
+    ],
+    "relevant_doc_ids": [
+      "ml_regression.md"
+    ]
+  },
+  {
+    "query": "Python的标准库有什么特点？",
+    "difficulty": "medium",
+    "category": "python",
+    "relevant_chunk_ids": [
+      "py_basics.md_4"
+    ],
+    "relevant_doc_ids": [
+      "py_basics.md"
+    ]
+  },
+  {
+    "query": "函数式编程在Python中如何体现？",
+    "difficulty": "medium",
+    "category": "python",
+    "relevant_chunk_ids": [
+      "py_features.md_2"
+    ],
+    "relevant_doc_ids": [
+      "py_features.md"
+    ]
+  },
+  {
+    "query": "如何选择交叉验证的方法？",
+    "difficulty": "medium",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_cv.md_5"
+    ],
+    "relevant_doc_ids": [
+      "ml_cv.md"
+    ]
+  },
+  {
+    "query": "SVM使用什么方法处理非线性问题？",
+    "difficulty": "hard",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_classification.md_5"
+    ],
+    "relevant_doc_ids": [
+      "ml_classification.md"
+    ],
+    "negative_chunk_ids": [
+      "ml_regression.md_3"
+    ]
+  },
+  {
+    "query": "回归问题常用的评估指标有哪些？",
+    "difficulty": "hard",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_eval.md_2"
+    ],
+    "relevant_doc_ids": [
+      "ml_eval.md"
+    ]
+  },
+  {
+    "query": "深度学习中的ResNet有什么创新？",
+    "difficulty": "hard",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_arch.md_4"
+    ],
+    "relevant_doc_ids": [
+      "ml_arch.md"
+    ]
+  },
+  {
+    "query": "Python的装饰器可以用来实现什么编程范式？",
+    "difficulty": "hard",
+    "category": "python",
+    "relevant_chunk_ids": [
+      "py_features.md_4"
+    ],
+    "relevant_doc_ids": [
+      "py_features.md"
+    ]
+  },
+  {
+    "query": "如何选择K-means聚类的最优K值？",
+    "difficulty": "hard",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_clustering.md_2"
+    ],
+    "relevant_doc_ids": [
+      "ml_clustering.md"
+    ]
+  },
+  {
+    "query": "监督学习和无监督学习的核心区别是什么？",
+    "difficulty": "hard",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_intro.md_1",
+      "ml_intro.md_2",
+      "ml_supervised.md_0"
+    ],
+    "relevant_doc_ids": [
+      "ml_intro.md",
+      "ml_supervised.md"
+    ],
+    "negative_chunk_ids": [
+      "ml_supervised.md_3"
+    ]
+  },
+  {
+    "query": "Python为什么适合数据科学和人工智能？",
+    "difficulty": "hard",
+    "category": "python",
+    "relevant_chunk_ids": [
+      "py_basics.md_6"
+    ],
+    "relevant_doc_ids": [
+      "py_basics.md"
+    ]
+  },
+  {
+    "query": "强化学习和监督学习的区别是什么？",
+    "difficulty": "hard",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_intro.md_1",
+      "ml_intro.md_3"
+    ],
+    "relevant_doc_ids": [
+      "ml_intro.md"
+    ]
+  },
+  {
+    "query": "卷积层和池化层在CNN中各起什么作用？",
+    "difficulty": "hard",
+    "category": "ml",
+    "relevant_chunk_ids": [
+      "ml_arch.md_1",
+      "ml_arch.md_2"
+    ],
+    "relevant_doc_ids": [
+      "ml_arch.md"
+    ]
+  }
+]

@@ -3,11 +3,12 @@
 
 # --- Embedding Model ---
 embedding:
-  model_name: "BAAI/bge-small-zh-v1.5"  # Lightweight Chinese model (~100MB, fast startup)
-  model_name_zh: "BAAI/bge-small-zh-v1.5"
+  model_name: "BAAI/bge-m3"  # Multilingual model (Chinese + English, ~2GB)
+  model_name_zh: "BAAI/bge-m3"
   device: "cpu"  # cpu | cuda
   normalize: true
-  batch_size: 32
+  batch_size: 32  # Query embedding batch size
+  onnx_batch_size: 500  # Batch size for bulk embedding processing
   use_onnx: false  # Enable ONNX Runtime acceleration
 
 # --- Chunking ---
@@ -15,7 +16,7 @@ chunking:
   chunk_size: 512  # Max tokens per chunk
   chunk_overlap: 128  # Overlap between adjacent chunks
   semantic_threshold: 0.65  # Cosine similarity threshold for semantic split
-  min_chunk_size: 50  # Minimum tokens for a chunk
+  min_chunk_size: 20  # Minimum tokens for a chunk (token-based, not char-based)
   max_section_size: 512  # Max tokens before triggering semantic split
 
 # --- Vector Store (ChromaDB) ---
@@ -26,6 +27,7 @@ chromadb:
   hnsw_M: 8  # Lower = less memory
   hnsw_ef_search: 50
   cache_max_entries: 10000
+  document_store_path: "./data/document_store.db"  # Source of truth for index recovery
 
 # --- BM25 ---
 bm25:
@@ -33,6 +35,7 @@ bm25:
   k1: 1.5  # BM25 parameter
   max_index_entries: 100000  # Threshold for SQLite fallback
   fallback_db_path: "./data/bm25_fallback.db"
+  persist: true  # Keep the sparse index across process restarts
 
 # --- Retrieval ---
 retrieval:
@@ -41,6 +44,10 @@ retrieval:
   rrf_k: 60  # RRF constant
   fusion_top_k: 50  # Candidates after RRF fusion
   final_top_k: 5  # Final results returned to user
+  retrieval_timeout: 5.0  # Timeout in seconds for retrieval operations
+  retrieval_retries: 1  # Number of retry attempts on retrieval failure
+  min_score_threshold: 0.001  # Minimum score threshold for result inclusion
+  context_window: 1  # Number of neighboring chunks to fetch (0=disabled)
 
   # Dynamic RRF weights
   rrf_weights:
@@ -53,12 +60,13 @@ retrieval:
 
 # --- Reranking ---
 reranking:
-  enabled: false  # Disabled for quick startup; enable when needed
-  model_name: "BAAI/bge-reranker-v2-m3"  # Multilingual reranker for Chinese + English
+  enabled: false  # RRF fusion is the strongest default; heuristic rerank is opt-in
+  use_cross_encoder: false  # Enable only when BAAI/bge-reranker-v2-m3 is available
+  model_name: "BAAI/bge-reranker-v2-m3"  # Multilingual cross-encoder
   device: "cpu"
   batch_size: 16
   max_candidates: 50  # Max candidates to rerank
-  timeout_seconds: 1.5  # Timeout for reranking, fallback to RRF
+  timeout_seconds: 3.0  # Timeout for cross-encoder reranking, fallback to RRF
 
 # --- Query Expansion ---
 query_expansion:
@@ -78,7 +86,7 @@ cache:
 generation:
   provider: "ollama"  # ollama | openai
   ollama:
-    model: "qwen2.5:7b"
+    model: "qwen2.5:7b"  # Recommended: qwen2.5:7b (fast, good Chinese) | deepseek-r1:8b (slow, reasoning)
     base_url: "http://localhost:11434"
   openai:
     model: "gpt-3.5-turbo"
@@ -98,3 +106,22 @@ logging:
   level: "INFO"  # DEBUG | INFO | WARNING | ERROR
   file: "./logs/hermes_rag.log"
   format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+
+# --- Monitoring ---
+monitoring:
+  enable_metrics: true  # Enable metrics collection
+  metrics_window: 500  # Sliding window size for latency tracking
+
+# --- UI ---
+ui:
+  dark_mode: false  # Default UI theme (false = light mode)
+
+# --- Auto Ingest ---
+auto_ingest:
+  enabled: true  # Auto-ingest documents on startup if knowledge base is empty
+  doc_dir: "evaluation/data/sample_docs"  # Default document directory to scan
+
+# --- Security ---
+security:
+  max_query_length: 2000  # Maximum allowed query length in characters
+  rate_limit_per_minute: 60  # Maximum queries per minute

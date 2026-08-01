@@ -7,15 +7,14 @@ import sys
 import threading
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Optional
 
 # Ensure project root is in sys.path
 _project_root = Path(__file__).parent.parent
 if str(_project_root) not in sys.path:
     sys.path.insert(0, str(_project_root))
 
-from fastapi import APIRouter, HTTPException, Query, Depends, Header
-from pydantic import BaseModel
+from fastapi import APIRouter, Depends, Header, HTTPException  # noqa: E402
+from pydantic import BaseModel  # noqa: E402
 
 logger = logging.getLogger("hermes_rag")
 
@@ -32,7 +31,7 @@ _executor = ThreadPoolExecutor(max_workers=2)
 _API_KEY = os.environ.get("HERMES_API_KEY", "")
 
 
-def _verify_api_key(x_api_key: Optional[str] = Header(None)) -> bool:
+def _verify_api_key(x_api_key: str | None = Header(None)) -> bool:
     """Verify API key if authentication is configured."""
     if not _API_KEY:
         return True
@@ -45,7 +44,7 @@ def _verify_api_key(x_api_key: Optional[str] = Header(None)) -> bool:
 
 class IngestRequest(BaseModel):
     source: str  # File path or URL
-    source_type: Optional[str] = None  # pdf, docx, pptx, txt, md, web
+    source_type: str | None = None  # pdf, docx, pptx, txt, md, web
 
 
 class IngestResponse(BaseModel):
@@ -62,19 +61,21 @@ class QueryRequest(BaseModel):
     use_reranker: bool = True
     generate_answer: bool = False
 
+    model_config = {"extra": "forbid"}
+
 
 class RetrievedChunk(BaseModel):
     chunk_id: str
     text: str
     metadata: dict
     score: float
-    source: Optional[str] = None
+    source: str | None = None
 
 
 class QueryResponse(BaseModel):
     query: str
     results: list
-    answer: Optional[str] = None
+    answer: str | None = None
     timing: dict
 
 
@@ -82,6 +83,15 @@ class HealthResponse(BaseModel):
     status: str
     vector_count: int
     bm25_count: int
+    document_count: int
+    version: str
+
+
+class StatsResponse(BaseModel):
+    index: dict
+    cache: dict
+    metrics: dict
+    config: dict
     version: str
 
 
@@ -116,12 +126,12 @@ async def _get_pipeline_async():
 async def ingest(request: IngestRequest, _auth: bool = Depends(_verify_api_key)):
     """Ingest a document into the index."""
     try:
-        from src.core.ingestion.parser_factory import ParserFactory
-        from src.core.chunking.hierarchical_chunker import HierarchicalChunker
         from src.config import get_config
+        from src.core.chunking.hierarchical_chunker import HierarchicalChunker
+        from src.core.ingestion.parser_factory import ParserFactory
         from src.utils.security import (
-            validate_file_path,
             validate_file_extension,
+            validate_file_path,
             validate_file_size,
             validate_url,
         )
@@ -197,6 +207,12 @@ async def ingest(request: IngestRequest, _auth: bool = Depends(_verify_api_key))
 async def query(request: QueryRequest, _auth: bool = Depends(_verify_api_key)):
     """Query the retrieval pipeline."""
     try:
+        # Validate top_k
+        if request.top_k < 1:
+            raise HTTPException(status_code=422, detail={"error": "invalid_input", "message": "top_k must be >= 1"})
+        if request.top_k > 1000:
+            raise HTTPException(status_code=422, detail={"error": "invalid_input", "message": "top_k must be <= 1000"})
+
         pipeline = _get_pipeline()
         result = pipeline.retrieve(
             query=request.query,
@@ -237,6 +253,8 @@ async def query(request: QueryRequest, _auth: bool = Depends(_verify_api_key)):
             timing=result.get("timing", {}),
         )
 
+    except HTTPException:
+        raise
     except ValueError as e:
         raise HTTPException(status_code=400, detail={"error": "invalid_query", "message": str(e)})
     except Exception as e:
@@ -251,8 +269,9 @@ async def health():
         pipeline = _get_pipeline()
         return HealthResponse(
             status="healthy",
-            vector_count=pipeline.index_manager.vector_store.count(),
-            bm25_count=pipeline.index_manager.bm25_index.count(),
+            vector_count=pipeline.index_manager.vector_store.count() if pipeline.index_manager.vector_store else 0,
+            bm25_count=pipeline.index_manager.bm25_index.count() if pipeline.index_manager.bm25_index else 0,
+            document_count=pipeline.index_manager.document_store.count() if pipeline.index_manager.document_store else 0,
             version="1.0.0",
         )
     except Exception:
@@ -260,5 +279,71 @@ async def health():
             status="initializing",
             vector_count=0,
             bm25_count=0,
+            document_count=0,
             version="1.0.0",
         )
+
+
+def _redact_config(data):
+    """Remove secrets from config before exposing it through the API."""
+    if isinstance(data, dict):
+        redacted = {}
+        for k, v in data.items():
+            if isinstance(v, dict):
+                redacted[k] = _redact_config(v)
+            elif k.lower() in ("api_key", "password", "token", "secret"):
+                redacted[k] = "***"
+            else:
+                redacted[k] = v
+        return redacted
+    return data
+
+
+@router.get("/stats", response_model=StatsResponse)
+async def stats(_auth: bool = Depends(_verify_api_key)):
+    """Return index, cache, metrics, and redacted config statistics."""
+    try:
+        pipeline = _get_pipeline()
+        from src.config import get_config
+        from src.utils.metrics import get_metrics
+
+        index_stats = {}
+        try:
+            index_stats = pipeline.index_manager.get_stats()
+        except Exception as e:
+            index_stats = {"error": str(e)}
+
+        cache_stats = {"enabled": pipeline.cache is not None}
+        if pipeline.cache is not None:
+            try:
+                cache_stats.update(pipeline.cache.get_stats())
+            except Exception as e:
+                cache_stats["error"] = str(e)
+
+        metrics = {}
+        try:
+            metrics = get_metrics().get_full_report()
+        except Exception as e:
+            metrics = {"error": str(e)}
+
+        return StatsResponse(
+            index=index_stats,
+            cache=cache_stats,
+            metrics=metrics,
+            config=_redact_config(get_config().to_dict()),
+            version="1.0.0",
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail={"error": "stats_failed", "message": str(e)})
+
+
+@router.post("/rebuild", response_model=dict)
+async def rebuild(_auth: bool = Depends(_verify_api_key)):
+    """Rebuild vector and BM25 indexes from the persisted document store."""
+    try:
+        pipeline = _get_pipeline()
+        counts = pipeline.index_manager.rebuild_from_document_store()
+        return {"status": "success", "counts": counts}
+    except Exception as e:
+        logger.exception(f"Rebuild failed: {e}")
+        raise HTTPException(status_code=500, detail={"error": "rebuild_failed", "message": str(e)})

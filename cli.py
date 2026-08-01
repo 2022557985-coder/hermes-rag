@@ -21,16 +21,16 @@ sys.path.insert(0, str(Path(__file__).parent))
 def cmd_ingest(args):
     """Ingest documents into the index."""
     from src.config import get_config
-    from src.core.ingestion.parser_factory import ParserFactory
     from src.core.chunking.hierarchical_chunker import HierarchicalChunker
+    from src.core.ingestion.parser_factory import ParserFactory
     from src.core.pipeline_factory import build_pipeline
     from src.utils.logger import setup_logger
-    from src.utils.timer import Stopwatch
     from src.utils.security import (
-        validate_file_path,
         validate_file_extension,
+        validate_file_path,
         validate_file_size,
     )
+    from src.utils.timer import Stopwatch
 
     cfg = get_config()
     logger = setup_logger(
@@ -65,7 +65,7 @@ def cmd_ingest(args):
         for root, _, filenames in os.walk(source_path):
             for fname in filenames:
                 ext = Path(fname).suffix.lower()
-                if ext in (".pdf", ".docx", ".pptx", ".txt", ".md", ".markdown"):
+                if ext in (".pdf", ".docx", ".pptx", ".ppt", ".txt", ".md", ".markdown", ".rst", ".csv", ".json", ".html", ".htm", ".log"):
                     files.append(os.path.join(root, fname))
         logger.info(f"Found {len(files)} files to ingest")
     else:
@@ -147,6 +147,7 @@ def cmd_query(args):
 def cmd_serve(args):
     """Start the FastAPI server."""
     import uvicorn
+
     from src.config import get_config
 
     cfg = get_config()
@@ -160,9 +161,125 @@ def cmd_serve(args):
 
 
 def cmd_ui(args):
-    """Launch the Gradio UI."""
+    """Launch the Gradio UI with auto-ingest support."""
+    from src.config import get_config
+    from src.utils.logger import setup_logger
+
+    cfg = get_config()
+    logger = setup_logger(level=cfg.logging.level, log_file=cfg.logging.file)
+
+    # Auto-ingest: check if knowledge base is empty on startup
+    if cfg.auto_ingest.enabled:
+        _auto_ingest_on_startup(cfg, logger)
+
     from ui.gradio_app import main
     main()
+
+
+def _auto_ingest_on_startup(cfg, logger):
+    """Auto-ingest documents when the document store is empty."""
+    from pathlib import Path
+
+    doc_dir = cfg.auto_ingest.doc_dir
+    if not Path(doc_dir).exists():
+        logger.warning(f"Auto-ingest directory not found: {doc_dir}")
+        return
+
+    import os
+
+    from src.core.chunking.hierarchical_chunker import HierarchicalChunker
+    from src.core.indexing.document_store import DocumentStore
+    from src.core.indexing.index_manager import IndexManager
+    from src.core.ingestion.parser_factory import ParserFactory
+    from src.core.pipeline_factory import build_pipeline
+    from src.utils.security import validate_file_extension, validate_file_path, validate_file_size
+    from src.utils.timer import Stopwatch
+
+    files = []
+    for root, _, filenames in os.walk(doc_dir):
+        for fname in filenames:
+            ext = Path(fname).suffix.lower()
+            if ext in (".pdf", ".docx", ".pptx", ".ppt", ".txt", ".md", ".markdown", ".rst", ".csv", ".json", ".html", ".htm", ".log"):
+                files.append(os.path.join(root, fname))
+
+    if not files:
+        logger.warning(f"No supported files found in {doc_dir}")
+        return
+
+    # Lightweight pre-check before building the heavy pipeline: when the index
+    # layout changed, clear only documents that came from doc_dir so startup
+    # re-chunks them from source instead of rebuilding stale chunk text.
+    try:
+        doc_store = DocumentStore(cfg.chromadb.document_store_path)
+        if doc_store.count() > 0:
+            stored_version = doc_store.get_meta("index_version")
+            stored_signature = doc_store.get_meta("layout_signature")
+            expected_signature = IndexManager.compute_layout_signature()
+            doc_basenames = {os.path.basename(f) for f in files}
+            sources = {
+                c.get("metadata", {}).get("source", "")
+                for c in doc_store.get_all_chunks()
+            }
+            layout_stale = stored_signature is None or stored_signature != expected_signature
+            if (stored_version == IndexManager.INDEX_VERSION and not layout_stale) or not sources <= doc_basenames:
+                logger.info(
+                    f"Document store already has {doc_store.count()} chunks, skipping auto-ingest."
+                )
+                doc_store.close()
+                return
+            logger.info(
+                "Index layout changed (version=%s signature=%s -> %s), clearing managed documents for re-ingest...",
+                stored_version,
+                stored_signature,
+                expected_signature,
+            )
+            doc_store.clear()
+            doc_store.set_meta("index_version", IndexManager.INDEX_VERSION)
+            doc_store.set_meta("layout_signature", expected_signature)
+        doc_store.close()
+    except Exception as e:
+        logger.warning(f"Document store check failed: {e}")
+
+    sw = Stopwatch()
+    pipeline = build_pipeline(config=cfg)
+    index_manager = pipeline.index_manager
+
+    # Remove any leftover vector/BM25 entries for the cleared documents.
+    index_manager.clear()
+
+    logger.info(f"Auto-ingesting documents from: {doc_dir}")
+    chunker = HierarchicalChunker(
+        chunk_size=cfg.chunking.chunk_size,
+        chunk_overlap=cfg.chunking.chunk_overlap,
+        semantic_threshold=cfg.chunking.semantic_threshold,
+        min_chunk_size=cfg.chunking.min_chunk_size,
+        max_section_size=cfg.chunking.max_section_size,
+        embedding_model=cfg.embedding.model_name,
+        embedding_device=cfg.embedding.device,
+    )
+
+    logger.info(f"Auto-ingest: found {len(files)} files")
+    total_chunks = 0
+    for file_path in files:
+        try:
+            validate_file_path(file_path)
+            validate_file_extension(file_path)
+            validate_file_size(file_path)
+            parsed = ParserFactory.get_parser(file_path).parse(file_path)
+            source_name = os.path.basename(file_path)  # Use basename for consistent chunk IDs
+            chunks = chunker.chunk(
+                text=parsed["text"],
+                source_name=source_name,
+                headings=parsed.get("metadata", {}).get("headings"),
+            )
+            if chunks:
+                index_manager.ingest_chunks(chunks)
+                total_chunks += len(chunks)
+        except Exception as e:
+            logger.warning(f"Auto-ingest skipped {file_path}: {e}")
+
+    elapsed = sw.elapsed()
+    logger.info(f"Auto-ingest complete: {total_chunks} chunks in {elapsed:.2f}s")
 
 
 def main():

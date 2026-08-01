@@ -2,7 +2,7 @@
 
 import re
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any
 
 from .parser_factory import BaseParser
 
@@ -10,7 +10,7 @@ from .parser_factory import BaseParser
 class PDFParser(BaseParser):
     """Parse PDF documents using PyMuPDF."""
 
-    def parse(self, source: str) -> Dict[str, Any]:
+    def parse(self, source: str) -> dict[str, Any]:
         """Parse a PDF file.
 
         Args:
@@ -69,7 +69,6 @@ class PDFParser(BaseParser):
 
     def _extract_tables(self, page) -> list:
         """Extract tables from a page, convert to Markdown."""
-        import fitz
         tables = []
         try:
             tabs = page.find_tables()

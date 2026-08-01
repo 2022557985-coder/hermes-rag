@@ -1,8 +1,7 @@
 """Tests for indexing module."""
 
-import pytest
-from src.core.indexing.vector_store import VectorStore
 from src.core.indexing.bm25_index import BM25Index
+from src.core.indexing.vector_store import VectorStore
 
 
 class TestVectorStore:

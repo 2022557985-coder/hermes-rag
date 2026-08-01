@@ -1,7 +1,6 @@
 """Text processing utilities: encoding detection, tokenization routing."""
 
 import re
-from typing import List, Optional
 
 import charset_normalizer
 
@@ -31,7 +30,7 @@ def read_file_with_encoding(file_path: str) -> str:
         File content as string.
     """
     encoding = detect_encoding(file_path)
-    with open(file_path, "r", encoding=encoding, errors="replace") as f:
+    with open(file_path, encoding=encoding, errors="replace") as f:
         return f.read()
 
 
@@ -70,7 +69,7 @@ def get_language_ratio(text: str) -> dict:
     }
 
 
-def tokenize_text(text: str) -> List[str]:
+def tokenize_text(text: str) -> list[str]:
     """Route text to the appropriate tokenizer based on language.
 
     Chinese text -> jieba
@@ -164,7 +163,7 @@ def estimate_tokens(text: str) -> int:
     return int(chinese_chars / 1.5 + other_chars / 4.0)
 
 
-def split_sentences(text: str) -> List[str]:
+def split_sentences(text: str) -> list[str]:
     """Split text into sentences, handling both Chinese and English punctuation.
 
     Args:

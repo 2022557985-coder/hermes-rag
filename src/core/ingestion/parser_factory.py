@@ -1,14 +1,13 @@
 """Parser factory for document ingestion."""
 
-import os
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any
 
 
 class BaseParser:
     """Base class for all document parsers."""
     
-    def parse(self, source: str) -> Dict[str, Any]:
+    def parse(self, source: str) -> dict[str, Any]:
         """Parse a document and return structured content.
 
         Args:
@@ -53,7 +52,7 @@ class BaseParser:
 class ParserFactory:
     """Factory that routes to the correct parser based on file extension."""
 
-    _parsers: Dict[str, type] = {}
+    _parsers: dict[str, type] = {}
 
     @classmethod
     def register(cls, extensions: list, parser_class: type):
@@ -87,15 +86,18 @@ class ParserFactory:
 
 # Register built-in parsers
 def _register_parsers():
-    from .pdf_parser import PDFParser
     from .docx_parser import DocxParser
+    from .pdf_parser import PDFParser
     from .pptx_parser import PptxParser
     from .text_parser import TextParser
 
     ParserFactory.register([".pdf"], PDFParser)
     ParserFactory.register([".docx"], DocxParser)
     ParserFactory.register([".pptx", ".ppt"], PptxParser)
-    ParserFactory.register([".txt", ".md", ".markdown", ".rst"], TextParser)
+    ParserFactory.register(
+        [".txt", ".md", ".markdown", ".rst", ".csv", ".json", ".html", ".htm", ".log"],
+        TextParser,
+    )
 
 
 _register_parsers()
