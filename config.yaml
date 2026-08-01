@@ -1,0 +1,100 @@
+# Hermes-RAG Configuration
+# All parameters can be tuned without modifying source code
+
+# --- Embedding Model ---
+embedding:
+  model_name: "BAAI/bge-m3"  # Multilingual model supporting Chinese + English
+  model_name_zh: "BAAI/bge-m3"
+  device: "cpu"  # cpu | cuda
+  normalize: true
+  batch_size: 32
+  use_onnx: false  # Enable ONNX Runtime acceleration
+
+# --- Chunking ---
+chunking:
+  chunk_size: 512  # Max tokens per chunk
+  chunk_overlap: 128  # Overlap between adjacent chunks
+  semantic_threshold: 0.65  # Cosine similarity threshold for semantic split
+  min_chunk_size: 50  # Minimum tokens for a chunk
+  max_section_size: 512  # Max tokens before triggering semantic split
+
+# --- Vector Store (ChromaDB) ---
+chromadb:
+  persist_directory: "./data/chroma_db"
+  collection_name: "hermes_rag"
+  hnsw_ef_construction: 100  # Lower = less memory, slightly lower recall
+  hnsw_M: 8  # Lower = less memory
+  hnsw_ef_search: 50
+  cache_max_entries: 10000
+
+# --- BM25 ---
+bm25:
+  b: 0.75  # BM25 parameter
+  k1: 1.5  # BM25 parameter
+  max_index_entries: 100000  # Threshold for SQLite fallback
+  fallback_db_path: "./data/bm25_fallback.db"
+
+# --- Retrieval ---
+retrieval:
+  dense_top_k: 100  # Candidates from vector search
+  sparse_top_k: 100  # Candidates from BM25 search
+  rrf_k: 60  # RRF constant
+  fusion_top_k: 50  # Candidates after RRF fusion
+  final_top_k: 5  # Final results returned to user
+
+  # Dynamic RRF weights
+  rrf_weights:
+    default_dense: 0.5
+    default_sparse: 0.5
+    product_code_dense: 0.3  # When query contains product codes
+    product_code_sparse: 0.7
+    colloquial_dense: 0.8  # When query is colloquial
+    colloquial_sparse: 0.2
+
+# --- Reranking ---
+reranking:
+  enabled: true
+  model_name: "BAAI/bge-reranker-v2-m3"  # Multilingual reranker for Chinese + English
+  device: "cpu"
+  batch_size: 16
+  max_candidates: 50  # Max candidates to rerank
+  timeout_seconds: 1.5  # Timeout for reranking, fallback to RRF
+
+# --- Query Expansion ---
+query_expansion:
+  hyde_enabled: false  # Default: off, T5-small generates noise
+  hyde_model: "google-t5/t5-small"
+  synonym_enabled: true
+  max_synonyms: 3  # Max synonyms per word
+
+# --- Cache ---
+cache:
+  enabled: true
+  similarity_threshold: 0.95  # Cosine similarity threshold for cache hit
+  max_cache_size: 1000
+  ttl_seconds: 3600  # Cache TTL: 1 hour
+
+# --- Generation ---
+generation:
+  provider: "ollama"  # ollama | openai
+  ollama:
+    model: "qwen2.5:7b"
+    base_url: "http://localhost:11434"
+  openai:
+    model: "gpt-3.5-turbo"
+    api_key: "${OPENAI_API_KEY}"
+    base_url: "https://api.openai.com/v1"
+  max_context_tokens: 2048
+  temperature: 0.1
+
+# --- API ---
+api:
+  host: "0.0.0.0"
+  port: 8000
+  workers: 1  # Single worker for CPU-only environments
+
+# --- Logging ---
+logging:
+  level: "INFO"  # DEBUG | INFO | WARNING | ERROR
+  file: "./logs/hermes_rag.log"
+  format: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
