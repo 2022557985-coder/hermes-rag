@@ -79,7 +79,7 @@ def create_ui():
         except Exception as e:
             return f"Error: {e}", "", ""
 
-    with gr.Blocks(title="Hermes-RAG", theme=gr.themes.Soft()) as demo:
+    with gr.Blocks(title="Hermes-RAG") as demo:
         gr.Markdown(
             """
             # Hermes-RAG
@@ -138,6 +138,7 @@ def main():
         server_name="0.0.0.0",
         server_port=7860,
         share=False,
+        theme=gr.themes.Soft(),
     )
 
 
