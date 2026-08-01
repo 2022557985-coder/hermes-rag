@@ -58,7 +58,7 @@ class VectorStore:
                 self._collection = client.get_collection(
                     name=self.collection_name,
                 )
-            except (ValueError, KeyError, AttributeError):
+            except Exception:
                 self._collection = client.create_collection(
                     name=self.collection_name,
                     metadata={

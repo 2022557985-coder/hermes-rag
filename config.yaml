@@ -3,8 +3,8 @@
 
 # --- Embedding Model ---
 embedding:
-  model_name: "BAAI/bge-m3"  # Multilingual model supporting Chinese + English
-  model_name_zh: "BAAI/bge-m3"
+  model_name: "BAAI/bge-small-zh-v1.5"  # Lightweight Chinese model (~100MB, fast startup)
+  model_name_zh: "BAAI/bge-small-zh-v1.5"
   device: "cpu"  # cpu | cuda
   normalize: true
   batch_size: 32
@@ -53,7 +53,7 @@ retrieval:
 
 # --- Reranking ---
 reranking:
-  enabled: true
+  enabled: false  # Disabled for quick startup; enable when needed
   model_name: "BAAI/bge-reranker-v2-m3"  # Multilingual reranker for Chinese + English
   device: "cpu"
   batch_size: 16
