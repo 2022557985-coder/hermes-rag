@@ -7,9 +7,42 @@ import re
 import time
 from collections import OrderedDict
 from collections.abc import Generator
+from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger("hermes_rag")
+
+# Prompt template loaded from a file so prompt tweaks take effect without
+# restarting the server. Falls back to an embedded default if missing.
+_PROMPT_TEMPLATE_PATH = Path(__file__).parent / "prompt_template.txt"
+_PROMPT_TEMPLATE_FALLBACK = """你是一个专业、严谨的知识库问答助手。你必须基于下方「参考文档」回答问题，禁止编造任何信息。
+
+## 核心规则
+1. 直接作答，先给结论再展开细节。禁止用"根据现有资料无法回答"这类话术回避问题。
+2. 只要参考文档足以推导出答案，就必须回答；允许跨文档聚合、数值计算（写出步骤并核对单位与数量级）、多跳推理与排序推导。
+3. 排序/顺序题必须严格按参考文档列举的顺序作答；事件年份必须与原文精确对应，缺失时如实说明，禁止用其他年份事件顶替。
+4. 引用真实性：每个 [来源 N] 标注的内容必须能在该片段原文中找到；找不到依据的信息不得标注来源，必须写"参考文档未提供该信息"。
+5. 只有参考文档完全没有相关内容时才拒答，并具体说明缺少哪一项信息。
+6. 数字、日期、人名、地名必须与文档一致；文档只给出年份时，禁止编造月份和日期。
+
+## 参考文档
+{context_text}
+
+## 用户问题
+{query}
+
+## 回答
+"""
+
+
+def _load_prompt_template() -> str:
+    """Read the prompt template from disk (hot-reloadable), else fallback."""
+    try:
+        if _PROMPT_TEMPLATE_PATH.exists():
+            return _PROMPT_TEMPLATE_PATH.read_text(encoding="utf-8-sig")
+    except OSError:
+        pass
+    return _PROMPT_TEMPLATE_FALLBACK
 
 
 class LLMResponseCache:
@@ -128,7 +161,7 @@ class LLMClient:
 
         # Reserve tokens for prompt template and query
         query_tokens = self.count_tokens(query)
-        prompt_overhead = 200  # Approximate overhead for prompt template
+        prompt_overhead = 500  # Approximate overhead for prompt template
         available_tokens = max_tokens - query_tokens - prompt_overhead
 
         if available_tokens <= 0:
@@ -384,9 +417,8 @@ class LLMClient:
         context_parts = []
         for i, chunk in enumerate(context_chunks, 1):
             text = chunk.get("text", "")
-            chunk.get("metadata", {}).get("source", "unknown")
-            page = chunk.get("metadata", {}).get("page", "")
             heading = chunk.get("metadata", {}).get("heading_path", "")
+            page = chunk.get("metadata", {}).get("page", "")
 
             citation = f"[来源 {i}]"
             if heading:
@@ -397,32 +429,9 @@ class LLMClient:
             context_parts.append(f"{citation}\n{text}")
 
         context_text = "\n\n---\n\n".join(context_parts)
-
-        prompt = f"""你是一个专业的知识库问答助手。请严格按照以下规则回答用户问题：
-
-## 核心规则
-1. 仅基于下方「参考文档」中的内容回答，绝对不要编造或使用外部知识
-2. 如果信息不足以回答，明确说"根据现有资料无法回答"，并简要说明缺少哪些信息
-3. 回答时必须引用来源编号，格式为 [来源 N]
-4. 回答结构：先给出核心结论（1-2句），再展开关键细节，最后做简短总结
-5. 使用简洁、专业、准确的中文，避免冗长
-6. 如果涉及人名、地名、数字、日期等关键信息，务必准确引用原文
-
-## 回答步骤
-- 第1步：仔细阅读所有参考文档，理解用户问题的核心意图
-- 第2步：找出与问题最相关的文档片段，提取关键信息
-- 第3步：判断信息是否充分，如不充分则诚实说明
-- 第4步：组织回答，确保逻辑清晰、信息准确、引用规范
-
-## 参考文档
-{context_text}
-
-## 用户问题
-{query}
-
-## 回答"""
-        return prompt
-
+        return _load_prompt_template().format(
+            context_text=context_text, query=query
+        )
     def _generate_ollama(self, prompt: str, stream: bool = False) -> str:
         """Generate using Ollama API."""
         import requests

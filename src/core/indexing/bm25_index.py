@@ -576,6 +576,16 @@ class BM25Index:
                 return cursor.fetchone()[0]
         return len(self._chunks)
 
+    def get_chunk_ids(self) -> list[str]:
+        """Return the chunk IDs currently indexed."""
+        self._ensure_open()
+        if self._use_db and self._db_conn:
+            with self._db_lock:
+                cursor = self._db_conn.cursor()
+                cursor.execute("SELECT chunk_id FROM bm25_index")
+                return [r[0] for r in cursor.fetchall()]
+        return [c["chunk_id"] for c in self._chunks]
+
     def clear(self) -> None:
         """Clear all indexed data."""
         self._bm25 = None

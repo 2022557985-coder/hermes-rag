@@ -303,6 +303,20 @@ class VectorStore:
         except (AttributeError, ValueError, RuntimeError):
             return 0
 
+    def get_chunk_ids(self) -> list[str]:
+        """Return all chunk IDs currently in the store."""
+        try:
+            collection = self._get_collection()
+            data = collection.get(include=[])
+            return list(data.get("ids") or [])
+        except IndexDimensionMismatch:
+            raise
+        except (AttributeError, ValueError, RuntimeError):
+            return []
+        except Exception:
+            logger.warning("Failed to list chunk ids from vector store")
+            return []
+
     def clear(self) -> None:
         """Delete all chunks from the store."""
         try:

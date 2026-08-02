@@ -156,6 +156,29 @@ class IndexManager:
             except Exception as e:
                 logger.warning(f"Versioned index rebuild failed: {e}")
 
+        # Cross-store consistency: vector and BM25 must index exactly the
+        # chunks persisted in the document store (the source of truth). A
+        # stale or partial store (e.g. a chunk missing from BM25, or leftover
+        # vector entries from an older ingest) silently degrades retrieval
+        # quality, so rebuild the divergent store(s) from the document store.
+        if self.document_store and self.document_store.count() > 0:
+            try:
+                doc_ids = {c["chunk_id"] for c in self.document_store.get_all_chunks()}
+                vector_ids = set(self.vector_store.get_chunk_ids()) if self.vector_store else set()
+                bm25_ids = set(self.bm25_index.get_chunk_ids()) if self.bm25_index else set()
+                if vector_ids != doc_ids or bm25_ids != doc_ids:
+                    logger.warning(
+                        "Index consistency check failed (docstore=%d, vector=%d, bm25=%d); "
+                        "rebuilding from document store...",
+                        len(doc_ids), len(vector_ids), len(bm25_ids),
+                    )
+                    rebuilt = self.rebuild_from_document_store()
+                    result["actions"].append(
+                        f"consistency_rebuild:vector={rebuilt.get('vector_count')},bm25={rebuilt.get('bm25_count')}"
+                    )
+            except Exception as e:
+                logger.warning(f"Index consistency check failed: {e}")
+
         return result
 
     def rebuild_from_document_store(self) -> dict[str, int]:

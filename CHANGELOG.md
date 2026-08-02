@@ -2,6 +2,33 @@
 
 All notable changes to Hermes-RAG are documented in this file.
 
+## [Unreleased]
+
+### Fixed
+
+- Index stores could silently diverge from the document store (e.g. chunks
+  present in the vector index but missing from the persisted BM25 index), so
+  sparse retrieval served an incomplete index and RRF fusion pushed correct
+  results out of Top-K. `ensure_indexes()` now compares chunk sets across the
+  document store, vector store and BM25 index, and rebuilds divergent stores
+  from the document store on startup.
+- New documents dropped into the auto-ingest directory were never ingested
+  when the stored sources were still a subset of the directory contents.
+  `ingest` (CLI and startup auto-ingest) now records the processed source set
+  (`ingested_sources`), and startup re-ingests when the directory contains
+  files outside that set.
+- Proper-noun questions such as "陈祖敬是谁？" returned zero usable hits after
+  a partial re-ingest left the BM25 index missing the person's chunks while
+  the vector store still had them. New `VectorStore.get_chunk_ids()` /
+  `BM25Index.get_chunk_ids()` accessors plus the consistency check above repair
+  the live index automatically.
+
+### Added
+
+- `tests/test_index_consistency.py`: regression coverage for cross-store
+  divergence repair and for proper-noun retrieval ("陈祖敬是谁？" recalls
+  `陈祖敬.txt` chunks in the top results).
+
 ## [2.4.0] - 2026-08-01
 
 ### Fixed

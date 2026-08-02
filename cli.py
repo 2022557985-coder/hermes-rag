@@ -72,6 +72,7 @@ def cmd_ingest(args):
         files = [source_path]
 
     total_chunks = 0
+    ingested_basenames = set()
     for file_path in files:
         try:
             logger.info(f"Ingesting: {file_path}")
@@ -90,6 +91,7 @@ def cmd_ingest(args):
                 source_name=source_name,
                 headings=parsed.get("metadata", {}).get("headings"),
             )
+            ingested_basenames.add(source_name)
 
             if chunks:
                 counts = index_manager.ingest_chunks(chunks)
@@ -104,6 +106,16 @@ def cmd_ingest(args):
             logger.error(f"Failed to ingest {file_path}: {e}")
         except Exception as e:
             logger.error(f"Failed to ingest {file_path}: {e}")
+
+    # Record which source files were processed so startup auto-ingest can
+    # detect newly added documents without re-parsing the whole directory.
+    try:
+        index_manager.document_store.set_meta(
+            "ingested_sources",
+            json.dumps(sorted(ingested_basenames), ensure_ascii=False),
+        )
+    except Exception as e:
+        logger.warning(f"Failed to persist ingested sources: {e}")
 
     elapsed = sw.lap("total")
     logger.info(f"Ingestion complete: {total_chunks} chunks in {elapsed:.2f}s")
@@ -172,6 +184,38 @@ def cmd_ui(args):
     if cfg.auto_ingest.enabled:
         _auto_ingest_on_startup(cfg, logger)
 
+    from api.routes import _get_pipeline
+
+    # Pre-build the shared retrieval pipeline at startup so the first user
+    # query is not blocked by a slow lazy model load (60-90s on CPU).
+    _get_pipeline()
+
+    # Warm up the LLM in the background so the first generated answer
+    # streams without a long model-loading delay.
+    import threading
+
+    def _warm_llm():
+        try:
+            import requests as _req
+
+            _base = cfg.generation.ollama.base_url
+            _model = cfg.generation.ollama.model
+            _req.post(
+                f"{_base}/api/generate",
+                json={
+                    "model": _model,
+                    "prompt": "你好",
+                    "stream": False,
+                    "keep_alive": "30m",
+                    "options": {"num_predict": 1},
+                },
+                timeout=600,
+            )
+        except Exception as _e:  # noqa: BLE001 - warm-up must never crash startup
+            logger.warning(f"LLM warm-up skipped: {_e}")
+
+    threading.Thread(target=_warm_llm, daemon=True).start()
+
     from ui.gradio_app import main
     main()
 
@@ -191,7 +235,6 @@ def _auto_ingest_on_startup(cfg, logger):
     from src.core.indexing.document_store import DocumentStore
     from src.core.indexing.index_manager import IndexManager
     from src.core.ingestion.parser_factory import ParserFactory
-    from src.core.pipeline_factory import build_pipeline
     from src.utils.security import validate_file_extension, validate_file_path, validate_file_size
     from src.utils.timer import Stopwatch
 
@@ -220,8 +263,31 @@ def _auto_ingest_on_startup(cfg, logger):
                 c.get("metadata", {}).get("source", "")
                 for c in doc_store.get_all_chunks()
             }
-            layout_stale = stored_signature is None or stored_signature != expected_signature
-            if (stored_version == IndexManager.INDEX_VERSION and not layout_stale) or not sources <= doc_basenames:
+            # Compare only the chunk-layout prefix: embedding dimension drift is
+            # handled by IndexManager.ensure_indexes, which rebuilds the vector
+            # collection from the document store when the persisted dimension
+            # no longer matches. Comparing the full signature here would
+            # re-ingest every document on each startup after a manual ingest.
+            layout_stale = (
+                stored_signature is None
+                or stored_signature.split("|", 1)[0] != expected_signature.split("|", 1)[0]
+            )
+            # Detect newly added files: when the previous ingest recorded the
+            # source set, re-ingest if the directory now contains files that
+            # were not part of that set (e.g. documents dropped in later).
+            new_files_present = False
+            try:
+                recorded = json.loads(doc_store.get_meta("ingested_sources") or "[]")
+                if recorded:
+                    new_files_present = bool(doc_basenames - set(recorded))
+            except (TypeError, ValueError):
+                new_files_present = False
+            up_to_date = (
+                stored_version == IndexManager.INDEX_VERSION
+                and not layout_stale
+                and not new_files_present
+            )
+            if up_to_date or not sources <= doc_basenames:
                 logger.info(
                     f"Document store already has {doc_store.count()} chunks, skipping auto-ingest."
                 )
@@ -240,8 +306,12 @@ def _auto_ingest_on_startup(cfg, logger):
     except Exception as e:
         logger.warning(f"Document store check failed: {e}")
 
+    from api.routes import _get_pipeline
+
+    # Reuse the shared pipeline instance so the Gradio UI does not build
+    # a second (slow) pipeline on the first user query.
     sw = Stopwatch()
-    pipeline = build_pipeline(config=cfg)
+    pipeline = _get_pipeline()
     index_manager = pipeline.index_manager
 
     # Remove any leftover vector/BM25 entries for the cleared documents.
@@ -260,6 +330,7 @@ def _auto_ingest_on_startup(cfg, logger):
 
     logger.info(f"Auto-ingest: found {len(files)} files")
     total_chunks = 0
+    ingested_basenames = set()
     for file_path in files:
         try:
             validate_file_path(file_path)
@@ -272,11 +343,22 @@ def _auto_ingest_on_startup(cfg, logger):
                 source_name=source_name,
                 headings=parsed.get("metadata", {}).get("headings"),
             )
+            ingested_basenames.add(source_name)
             if chunks:
                 index_manager.ingest_chunks(chunks)
                 total_chunks += len(chunks)
         except Exception as e:
             logger.warning(f"Auto-ingest skipped {file_path}: {e}")
+
+    # Record which source files were processed so the next startup can detect
+    # newly added documents without re-parsing the whole directory.
+    try:
+        index_manager.document_store.set_meta(
+            "ingested_sources",
+            json.dumps(sorted(ingested_basenames), ensure_ascii=False),
+        )
+    except Exception as e:
+        logger.warning(f"Failed to persist ingested sources: {e}")
 
     elapsed = sw.elapsed()
     logger.info(f"Auto-ingest complete: {total_chunks} chunks in {elapsed:.2f}s")

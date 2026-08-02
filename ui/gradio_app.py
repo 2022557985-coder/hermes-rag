@@ -188,12 +188,14 @@ def _build_llm_client():
             base_url=cfg.generation.openai.base_url,
             api_key=cfg.generation.openai.api_key,
             temperature=cfg.generation.temperature,
+            max_context_tokens=cfg.generation.max_context_tokens,
         )
     return LLMClient(
         provider="ollama",
         model=cfg.generation.ollama.model,
         base_url=cfg.generation.ollama.base_url,
         temperature=cfg.generation.temperature,
+        max_context_tokens=cfg.generation.max_context_tokens,
     )
 
 
@@ -410,7 +412,7 @@ def query_hermes(query, top_k, use_reranker, generate_answer, chat_history, requ
         try:
             llm = _build_llm_client()
             prompt = llm._build_prompt(query, results)
-            num_predict = min(llm.max_context_tokens, 512)
+            num_predict = min(llm.max_context_tokens, 1024)
 
             import requests as req
             response = req.post(

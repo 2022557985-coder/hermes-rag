@@ -1,7 +1,9 @@
 """Query expansion: synonym expansion, HyDE (Hypothetical Document Embeddings)."""
 
+import json as _json
 import logging
 import re
+from pathlib import Path
 
 logger = logging.getLogger("hermes_rag")
 
@@ -97,6 +99,28 @@ _CN_SYNONYMS: dict[str, tuple[str, ...]] = {
     "数据科学": ("数据分析", "科学计算", "数据挖掘"),
     "人工智能": ("AI", "机器学习", "深度学习"),
     "适合": ("适用", "擅长", "用于"),
+    # 中英跨语言映射（提升跨语言召回）
+    "行星": ("planet", "planets", "星球"),
+    "太阳系": ("solar system", "行星系统"),
+    "山脉": ("mountain range", "mountain", "mountains"),
+    "火山": ("volcano", "volcanoes"),
+    "芯片": ("chip", "semiconductor", "晶圆"),
+    "半导体": ("semiconductor", "chip", "晶圆"),
+    "光刻机": ("lithography", "lithography machine", "EUV"),
+    "代工": ("foundry", "晶圆代工"),
+    "对乙酰氨基酚": ("acetaminophen", "paracetamol", "扑热息痛"),
+    "布洛芬": ("ibuprofen", "异丁苯丙酸"),
+    "药物": ("drug", "medicine", "medication"),
+    "温度": ("temperature", "气温", "升温"),
+    "海洋": ("ocean", "sea"),
+    "研发": ("R&D", "research and development", "科研"),
+    "营收": ("revenue", "收入", "营业额"),
+    "市场份额": ("market share", "份额", "占有率"),
+    "历史事件": ("historical event", "历史"),
+    "官方语言": ("official language"),
+    "面积": ("area", "国土面积"),
+    "内存安全": ("memory safety", "内存"),
+    "编程语言": ("programming language"),
 }
 
 # English synonym dictionary
@@ -130,6 +154,28 @@ _EN_SYNONYMS: dict[str, tuple[str, ...]] = {
     "k-means": ("kmeans", "clustering", "centroid"),
     "cnn": ("convolutional neural network", "convolution", "pooling"),
     "resnet": ("residual network", "residual connection", "deep network"),
+    # 中英跨语言映射（提升跨语言召回）
+    "planet": ("行星", "planets", "星球"),
+    "solar system": ("太阳系", "行星系统"),
+    "mountain range": ("山脉", "山系"),
+    "volcano": ("火山", "休眠火山"),
+    "memory safety": ("内存安全", "内存"),
+    "programming language": ("编程语言", "程序语言"),
+    "chip": ("芯片", "晶圆", "半导体"),
+    "semiconductor": ("半导体", "芯片"),
+    "lithography": ("光刻", "光刻机"),
+    "foundry": ("代工厂", "晶圆代工", "台积电"),
+    "acetaminophen": ("对乙酰氨基酚", "扑热息痛"),
+    "paracetamol": ("对乙酰氨基酚", "扑热息痛"),
+    "ibuprofen": ("布洛芬", "异丁苯丙酸"),
+    "surface temperature": ("表面温度", "地表温度"),
+    "market share": ("市场份额", "市场占有率"),
+    "official language": ("官方语言"),
+    "revenue": ("营收", "收入", "营业额"),
+    "research and development": ("研发", "R&D"),
+    "temperature": ("温度", "气温"),
+    "ocean": ("海洋"),
+    "historical event": ("历史事件"),
 }
 
 # Stop words for keyword extraction — frozenset is immutable and thread-safe
@@ -164,6 +210,24 @@ _STOP_WORDS: frozenset = frozenset({
 _TOKENIZE_RE: re.Pattern = re.compile(
     r"[\u4e00-\u9fff]+|[a-zA-Z]+|\d+|[^\s]"
 )
+
+
+# Extra synonyms loaded from a JSON file so additions are hot-reloadable
+# without restarting the server. {"cn": {...}, "en": {...}}
+_EXTRA_SYNONYMS_PATH = Path(__file__).parent / "extra_synonyms.json"
+
+
+def _load_extra_synonyms() -> tuple[dict[str, tuple[str, ...]], dict[str, tuple[str, ...]]]:
+    """Load extra synonym maps from JSON (hot-reloadable), else empty dicts."""
+    try:
+        if _EXTRA_SYNONYMS_PATH.exists():
+            data = _json.loads(_EXTRA_SYNONYMS_PATH.read_text(encoding="utf-8-sig"))
+            cn = {k: tuple(v) for k, v in data.get("cn", {}).items()}
+            en = {k: tuple(v) for k, v in data.get("en", {}).items()}
+            return cn, en
+    except (OSError, ValueError, TypeError, AttributeError):
+        pass
+    return {}, {}
 
 
 class QueryExpander:
@@ -282,15 +346,18 @@ class QueryExpander:
     def _get_synonyms(self, query: str) -> list[str]:
         """Get synonyms for words in the query (supports both Chinese and English)."""
         synonyms: list[str] = []
+        extra_cn, extra_en = _load_extra_synonyms()
+        cn_map = {**_CN_SYNONYMS, **extra_cn}
+        en_map = {**_EN_SYNONYMS, **extra_en}
         # Search Chinese synonyms
-        for word, syns in _CN_SYNONYMS.items():
+        for word, syns in cn_map.items():
             if word in query:
                 for s in syns[: self.max_synonyms]:
                     if s not in query:
                         synonyms.append(s)
         # Search English synonyms (case-insensitive)
         query_lower: str = query.lower()
-        for word, syns in _EN_SYNONYMS.items():
+        for word, syns in en_map.items():
             if word in query_lower:
                 for s in syns[: self.max_synonyms]:
                     if s.lower() not in query_lower:
@@ -315,12 +382,15 @@ class QueryExpander:
         weighted: list[tuple[str, float]] = []
         query_lower: str = query.lower()
         seen: set[str] = set()
+        extra_cn, extra_en = _load_extra_synonyms()
+        cn_map = {**_CN_SYNONYMS, **extra_cn}
+        en_map = {**_EN_SYNONYMS, **extra_en}
 
         for token in tokens:
             token_lower: str = token.lower()
 
             # Check Chinese synonyms
-            for word, syns in _CN_SYNONYMS.items():
+            for word, syns in cn_map.items():
                 if token == word:
                     # Exact match
                     for s in syns[: self.max_synonyms]:
@@ -335,7 +405,7 @@ class QueryExpander:
                             seen.add(s.lower())
 
             # Check English synonyms (case-insensitive)
-            for word, syns in _EN_SYNONYMS.items():
+            for word, syns in en_map.items():
                 word_lower: str = word.lower()
                 if token_lower == word_lower:
                     for s in syns[: self.max_synonyms]:

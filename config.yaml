@@ -92,7 +92,7 @@ generation:
     model: "gpt-3.5-turbo"
     api_key: "${OPENAI_API_KEY}"
     base_url: "https://api.openai.com/v1"
-  max_context_tokens: 2048
+  max_context_tokens: 4096
   temperature: 0.1
 
 # --- API ---

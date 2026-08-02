@@ -1,0 +1,16 @@
+﻿{
+  "cn": {
+    "阿司匹林": ["aspirin", "acetylsalicylic acid", "乙酰水杨酸"],
+    "低剂量": ["low-dose", "小剂量"],
+    "医药": ["medicine", "drug", "pharmaceutical"],
+    "剂量": ["dose", "dosage"],
+    "拜耳": ["Bayer"]
+  },
+  "en": {
+    "aspirin": ["阿司匹林", "乙酰水杨酸"],
+    "low-dose": ["低剂量", "小剂量"],
+    "dose": ["剂量", "用量"],
+    "medicine": ["医药", "药物"],
+    "pharmaceutical": ["医药", "制药"]
+  }
+}
