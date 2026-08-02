@@ -174,21 +174,27 @@ def cmd_serve(args):
 
 def cmd_ui(args):
     """Launch the Gradio UI with auto-ingest support."""
+    # Import FastAPI first: loading it before the heavy ML libraries
+    # (torch / chromadb / onnxruntime) avoids a flaky _ssl DLL init
+    # failure on Windows that crashes the process at import time.
+    from api.routes import _get_pipeline  # noqa: E402,F401
+
     from src.config import get_config
     from src.utils.logger import setup_logger
 
     cfg = get_config()
     logger = setup_logger(level=cfg.logging.level, log_file=cfg.logging.file)
+    print("[Hermes-RAG] 正在启动，请稍候...", flush=True)
 
     # Auto-ingest: check if knowledge base is empty on startup
     if cfg.auto_ingest.enabled:
         _auto_ingest_on_startup(cfg, logger)
 
-    from api.routes import _get_pipeline
-
     # Pre-build the shared retrieval pipeline at startup so the first user
     # query is not blocked by a slow lazy model load (60-90s on CPU).
+    print("[Hermes-RAG] 正在构建检索管道（约需 1-2 分钟）...", flush=True)
     _get_pipeline()
+    print("[Hermes-RAG] 检索管道就绪。", flush=True)
 
     # Warm up the LLM in the background so the first generated answer
     # streams without a long model-loading delay.
@@ -217,6 +223,7 @@ def cmd_ui(args):
     threading.Thread(target=_warm_llm, daemon=True).start()
 
     from ui.gradio_app import main
+    print("[Hermes-RAG] 正在启动 Web 界面，请访问 http://localhost:7860 ...", flush=True)
     main()
 
 
